@@ -7,7 +7,7 @@
 
 #### 1. Clone the GitHub Repository:
 ```bash
-git clone https://github.com/NeuralFalconYT/Kokoro-82M-WebUI.git
+git clone https://github.com/TheDevilPandaa/Kokoro-tts-aio-UI.git
 
 cd Kokoro-82M-WebUI
 ```
