@@ -9,7 +9,7 @@
 ```bash
 git clone https://github.com/TheDevilPandaa/Kokoro-tts-aio-UI.git
 
-cd Kokoro-82M-WebUI
+cd Kokoro-tts-aio-UI
 ```
 
 #### 2. Create a Python Virtual Environment:
