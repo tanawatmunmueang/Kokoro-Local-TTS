@@ -3,10 +3,10 @@ from KOKORO.models import build_model
 from KOKORO.utils import tts,tts_file_name,podcast
 import sys
 sys.path.append('.')
-import os 
+import os
 # os.system("python download_model.py")
 import torch
-import gc 
+import gc
 import platform
 import shutil
 base_path=os.getcwd()
@@ -90,13 +90,13 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
         else:
             gr.Warning("Upload small size .pt file only. Using the Current voice pack instead.")
     audio_path = tts_maker(
-        text, 
-        voice_name, 
-        speed, 
-        trim, 
-        pad_between_segments, 
-        save_at, 
-        remove_silence, 
+        text,
+        voice_name,
+        speed,
+        trim,
+        pad_between_segments,
+        save_at,
+        remove_silence,
         keep_silence
     )
     return audio_path
@@ -140,10 +140,10 @@ with gr.Blocks() as demo1:
             )
             with gr.Row():
                 voice = gr.Dropdown(
-                    voice_list, 
-                    value='af_bella', 
-                    allow_custom_value=False, 
-                    label='Voice', 
+                    voice_list,
+                    value='af_bella',
+                    allow_custom_value=False,
+                    label='Voice',
                     info='Starred voices are more stable'
                 )
             with gr.Row():
@@ -151,26 +151,26 @@ with gr.Blocks() as demo1:
             with gr.Accordion('Audio Settings', open=False):
                 model_name=gr.Dropdown(model_list,label="Model",value=model_list[0])
                 speed = gr.Slider(
-                    minimum=0.25, maximum=2, value=1, step=0.1, 
+                    minimum=0.25, maximum=2, value=1, step=0.1,
                     label='⚡️Speed', info='Adjust the speaking speed'
                 )
                 remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
                 minimum_silence = gr.Number(
-                    label="Keep Silence Upto (In seconds)", 
+                    label="Keep Silence Upto (In seconds)",
                     value=0.05
                 )
-                
+
                 # trim = gr.Slider(
-                #     minimum=0, maximum=1, value=0, step=0.1, 
+                #     minimum=0, maximum=1, value=0, step=0.1,
                 #     label='🔪 Trim', info='How much to cut from both ends of each segment'
-                # )   
+                # )
                 pad_between = gr.Slider(
-                    minimum=0, maximum=2, value=0, step=0.1, 
+                    minimum=0, maximum=2, value=0, step=0.1,
                     label='🔇 Pad Between', info='Silent Duration between segments [For Large Text]'
                 )
-                
+
                 custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
-                
+
         with gr.Column():
             audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
             with gr.Accordion('Enable Autoplay', open=False):
@@ -178,13 +178,13 @@ with gr.Blocks() as demo1:
                 autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
     text.submit(
-        text_to_speech, 
-        inputs=[text, model_name,voice, speed, pad_between, remove_silence, minimum_silence,custom_voicepack], 
+        text_to_speech,
+        inputs=[text, model_name,voice, speed, pad_between, remove_silence, minimum_silence,custom_voicepack],
         outputs=[audio]
     )
     generate_btn.click(
-        text_to_speech, 
-        inputs=[text,model_name, voice, speed, pad_between, remove_silence, minimum_silence,custom_voicepack], 
+        text_to_speech,
+        inputs=[text,model_name, voice, speed, pad_between, remove_silence, minimum_silence,custom_voicepack],
         outputs=[audio]
     )
 
@@ -196,7 +196,7 @@ def podcast_maker(text,remove_silence=False,minimum_silence=50,speed=0.9,model_n
     keep_silence = int(minimum_silence * 1000)
     podcast_save_at=podcast(MODEL, device,text,remove_silence=remove_silence, minimum_silence=keep_silence,speed=speed)
     return podcast_save_at
-    
+
 
 
 dummpy_example="""{af_sky} If you haven’t subscribed to The Devil Panda yet... what are you even doing?
@@ -216,12 +216,12 @@ with gr.Blocks() as demo2:
     with gr.Row():
         gr.Markdown(
             """
-            **Example Input:**                                                                                                                           
+            **Example Input:**
             {af_sky} If you haven’t subscribed to The Devil Panda yet... what are you even doing?<br>
             {af_bella} Smash that like button, or I might just cry.<br>
             {af_nicole} Comment below with your favorite part or I’ll haunt your notifications!<br>
             {bm_george} Panda deserves more subs. I said what I said.<br>
-            {am_santa} Subscribe now… or miss out on the coolest content on this side of YouTube.         <br>                                                                
+            {am_santa} Subscribe now… or miss out on the coolest content on this side of YouTube.         <br>
             """
         )
     with gr.Row():
@@ -235,12 +235,12 @@ with gr.Blocks() as demo2:
                 generate_btn = gr.Button('Generate', variant='primary')
             with gr.Accordion('Audio Settings', open=False):
                 speed = gr.Slider(
-                minimum=0.25, maximum=2, value=1, step=0.1, 
+                minimum=0.25, maximum=2, value=1, step=0.1,
                 label='⚡️Speed', info='Adjust the speaking speed'
                 )
                 remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
                 minimum_silence = gr.Number(
-                    label="Keep Silence Upto (In seconds)", 
+                    label="Keep Silence Upto (In seconds)",
                     value=0.20
                 )
         with gr.Column():
@@ -250,13 +250,13 @@ with gr.Blocks() as demo2:
                 autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
     text.submit(
-        podcast_maker, 
-        inputs=[text, remove_silence, minimum_silence,speed], 
+        podcast_maker,
+        inputs=[text, remove_silence, minimum_silence,speed],
         outputs=[audio]
     )
     generate_btn.click(
-        podcast_maker, 
-        inputs=[text, remove_silence, minimum_silence,speed], 
+        podcast_maker,
+        inputs=[text, remove_silence, minimum_silence,speed],
         outputs=[audio]
     )
 
@@ -310,19 +310,19 @@ import time
 def your_tts(text, audio_path, actual_duration, speed=0.8):
     global srt_voice_name
     model_name = "kokoro-v0_19.pth"
-    
+
     # Generate TTS audio
     tts_path = text_to_speech(text, model_name, voice_name=srt_voice_name, speed=speed, trim=1.0)
     tts_audio = AudioSegment.from_file(tts_path)
     tts_duration = len(tts_audio)
-    
+
     if actual_duration > 0:
         if tts_duration > actual_duration:
             speedup_factor = tts_duration / actual_duration
             tts_path = text_to_speech(text, model_name, voice_name=srt_voice_name, speed=speedup_factor, trim=1.0)
     else:
         pass
-    
+
     shutil.copy(tts_path, audio_path)
 
 
@@ -396,14 +396,14 @@ def speedup_audio_librosa(input_file, output_file, speedup_factor):
         # Save the output with the original sample rate
         sf.write(output_file, y_stretched, sr)
         # print(f"Speed up by {speedup_factor} completed successfully: {output_file}")
-    
+
     except Exception as e:
         gr.Warning(f"Error during speedup with Librosa: {e}")
         shutil.copy(input_file, output_file)
 
 
 
-    
+
 def is_ffmpeg_installed():
     if platform.system() == "Windows":
         local_ffmpeg_path = os.path.join("./ffmpeg", "ffmpeg.exe")
@@ -588,13 +588,13 @@ class SRTDubbing:
         with open("entries.json", "w") as file:
             json.dump(entries, file, indent=4)
         return entries
-srt_voice_name="af_bella"   
+srt_voice_name="af_bella"
 use_ffmpeg,local_ffmpeg_path = is_ffmpeg_installed()
 # use_ffmpeg=False
 
 def srt_process(srt_file_path,voice_name,custom_voicepack=None,dest_language="en"):
   global srt_voice_name,use_ffmpeg
-  
+
   if not srt_file_path.endswith(".srt"):
       gr.Error("Please upload a valid .srt file",duration=5)
       return None
@@ -610,13 +610,13 @@ def srt_process(srt_file_path,voice_name,custom_voicepack=None,dest_language="en
         srt_voice_name=voice_name
         gr.Warning("Upload small size .pt file only. Using the Current voice pack instead.")
   else:
-     srt_voice_name=voice_name 
+     srt_voice_name=voice_name
   srt_dubbing = SRTDubbing()
   dub_save_path=get_subtitle_Dub_path(srt_file_path,dest_language)
   srt_dubbing.srt_to_dub(srt_file_path,dub_save_path,dest_language)
   return dub_save_path
 
-# 
+#
 # srt_file_path="./long.srt"
 # dub_audio_path=srt_process(srt_file_path)
 # print(f"Audio file saved at: {dub_audio_path}")
@@ -628,7 +628,7 @@ with gr.Blocks() as demo3:
     gr.Markdown(
         """
         # Generate Audio File From Subtitle [Upload Only .srt file]
-        
+
         """
     )
     with gr.Row():
@@ -636,19 +636,19 @@ with gr.Blocks() as demo3:
             srt_file = gr.File(label='Upload .srt Subtitle File Only')
             with gr.Row():
                 voice = gr.Dropdown(
-                    voice_list, 
-                    value='af_bella', 
-                    allow_custom_value=False, 
-                    label='Voice', 
+                    voice_list,
+                    value='af_bella',
+                    allow_custom_value=False,
+                    label='Voice',
                 )
             with gr.Row():
                 generate_btn_ = gr.Button('Generate', variant='primary')
 
             with gr.Accordion('Audio Settings', open=False):
                 custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
-                
-            
-            
+
+
+
         with gr.Column():
             audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
             with gr.Accordion('Enable Autoplay', open=False):
@@ -656,19 +656,19 @@ with gr.Blocks() as demo3:
                 autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
     # srt_file.submit(
-    #     srt_process, 
-    #     inputs=[srt_file, voice], 
+    #     srt_process,
+    #     inputs=[srt_file, voice],
     #     outputs=[audio]
     # )
     generate_btn_.click(
-        srt_process, 
-        inputs=[srt_file,voice,custom_voicepack], 
+        srt_process,
+        inputs=[srt_file,voice,custom_voicepack],
         outputs=[audio]
     )
-    
 
 
-#### Voice mixing 
+
+#### Voice mixing
 # modified from here
 # https://huggingface.co/spaces/ysharma/Make_Custom_Voices_With_KokoroTTS
 def get_voices():
@@ -717,10 +717,10 @@ def parse_voice_formula(formula):
     """Parse the voice formula string and return the combined voice tensor."""
     if not formula.strip():
         raise ValueError("Empty voice formula")
-        
+
     # Initialize the weighted sum
     weighted_sum = None
-    
+
     # Split the formula into terms
     terms = formula.split('+')
     weights=0
@@ -738,9 +738,9 @@ def parse_voice_formula(formula):
         # Get the voice tensor
         if voice_name not in voices:
             raise ValueError(f"Unknown voice: {voice_name}")
-        
+
         voice_tensor = voices[voice_name]
-        
+
         # Add to weighted sum
         if weighted_sum is None:
             weighted_sum = weight * voice_tensor
@@ -803,8 +803,8 @@ def generate_voice_formula(*values):
             terms.append(f"{normalized_value:.3f} * {name}")
 
         return " + ".join(terms)
-    
-    
+
+
 
 
 
@@ -816,13 +816,13 @@ def create_voice_mix_ui():
             Select voices and adjust their weights to create a mixed voice.
             """
         )
-        
+
         voice_components = {}
         voice_names = list(voices.keys())
         female_voices = [name for name in voice_names if "f_" in name]
         male_voices = [name for name in voice_names if "b_" in name]
         neutral_voices = [name for name in voice_names if "f_" not in name and "b_" not in name]
-        
+
         # Define how many columns you want
         num_columns = 3
 
@@ -851,11 +851,11 @@ def create_voice_mix_ui():
                                 inputs=[checkbox],
                                 outputs=[weight_slider]
                             )
-        
+
         generate_ui_row(female_voices)
         generate_ui_row(male_voices)
         generate_ui_row(neutral_voices)
-        
+
         formula_inputs = []
         for i in voice_components:
             checkbox, slider = voice_components[i]
@@ -864,7 +864,7 @@ def create_voice_mix_ui():
 
         with gr.Row():
             voice_formula = gr.Textbox(label="Voice Formula", interactive=False)
-        
+
         # Function to dynamically update the voice formula
         def update_voice_formula(*args):
             formula_parts = []
@@ -886,7 +886,7 @@ def create_voice_mix_ui():
                 inputs=formula_inputs,
                 outputs=[voice_formula]
             )
-        
+
         with gr.Row():
             voice_text = gr.Textbox(
                 label='Enter Text',
@@ -897,10 +897,10 @@ def create_voice_mix_ui():
         with gr.Accordion('Audio Settings', open=False):
             model_name=gr.Dropdown(model_list,label="Model",value=model_list[0])
             speed = gr.Slider(
-                minimum=0.25, maximum=2, value=1, step=0.1, 
+                minimum=0.25, maximum=2, value=1, step=0.1,
                 label='⚡️Speed', info='Adjust the speaking speed'
             )
-            remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')            
+            remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
         with gr.Row():
             voice_audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
         with gr.Row():
@@ -917,12 +917,12 @@ def create_voice_mix_ui():
             except Exception as e:
                 raise gr.Error(f"Failed to generate audio: {e}")
 
-        
+
         voice_generator.click(
             generate_custom_audio,
             inputs=[voice_text, voice_formula,model_name,speed,remove_silence],
             outputs=[voice_audio,mix_voice_download]
-        )     
+        )
     return demo
 
 demo4 = create_voice_mix_ui()
@@ -934,14 +934,14 @@ demo4 = create_voice_mix_ui()
 
 # with gr.Blocks() as demo5:
 #     gr.Markdown(f"# Voice Names \n{display_text}")
-    
+
 #get voice names useful for local api
 import os
 import json
 
 def get_voice_names():
     male_voices, female_voices, other_voices = [], [], []
-    
+
     for filename in os.listdir("./KOKORO/voices"):
         if filename.endswith('.pt'):
             name = os.path.splitext(filename)[0]
@@ -953,7 +953,7 @@ def get_voice_names():
                 female_voices.append(name)
             else:
                 other_voices.append(name)
-    
+
     # Sort the lists by the length of the voice names
     male_voices = sorted(male_voices, key=len)
     female_voices = sorted(female_voices, key=len)
@@ -1015,7 +1015,7 @@ def main(debug, share):
     a[href*="youtube"]:hover {
         transform: scale(1.07);
         box-shadow: 0 6px 16px rgba(255, 0, 0, 0.3);
-       
+
     }
 </style>
         """)
@@ -1032,7 +1032,7 @@ def main(debug, share):
             with gr.Tab("Available Voice Names"):
                 demo5.render()
 
-    demo.queue().launch(debug=debug, share=share, server_port=8080)
+    demo.queue().launch(debug=debug, share=share, server_port=8080, inbrowser=True)
 
 if __name__ == "__main__":
     main()
