@@ -30,3 +30,7 @@ weighted_normalised_voices.pt
 # Generated runtime files
 run_app.bat
 voice_names.txt
+
+# Kokoro downloads and generated files
+# These are generated when setting up the project
+KOKORO/
