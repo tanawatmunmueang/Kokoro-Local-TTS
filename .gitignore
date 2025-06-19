@@ -1,0 +1,32 @@
+# Python virtual environment
+myenv/
+venv/
+.venv/
+env/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Temporary or generated audio/data folders
+cache/
+kokoro_audio/
+temp_audio/
+
+# Downloaded tools and dependencies
+ffmpeg/
+
+# Downloaded or generated model files
+# Only keep the original source models in the repo.
+weighted_normalised_voices.pt
+
+# Installers and executables
+*.msi
+*.exe
+
+# Log files
+*.log
+
+# Generated runtime files
+run_app.bat
+voice_names.txt
