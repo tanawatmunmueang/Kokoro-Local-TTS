@@ -983,41 +983,29 @@ def main(debug, share):
     with gr.Blocks(theme=gr.themes.Ocean(), title="Kokoro TTS - Local Generator") as demo:
 
         # Custom header and subscribe link
-        gr.HTML("""
-        <div style="text-align: center; margin-bottom: 1.5rem;">
-  <h1 style="font-size: 2em; margin-bottom: 0.75rem; background: linear-gradient(to right, #0083B0, #00B4DB); -webkit-background-clip: text; color: transparent;">
-    🎶 Kokoro-TTS Generator - Offline 🎙️
-  </h1>
+        gr.HTML(
+        """
+        <style>
+        /* Main container for the title */
+        .title-container {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
 
-  <div style="display: flex; justify-content: space-between; align-items: center; background-color: #f9f9f9; padding: 1rem; border-radius: 12px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); max-width: 700px; margin: 0 auto;">
-    <!-- YouTube Logo -->
-                <a href="https://www.youtube.com/@TheDevilPANDA00">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg" alt="YouTube" style="height: 32px; margin-right: 12px;">
-                </a>
-    <!-- Center Text -->
-    <div style="flex-grow: 1; text-align: left; margin-left: 10px;">
-      <h3 style="margin: 0; font-size: 1.4rem; font-weight: 600; color: #333;">The Devil Panda</h3>
-      <p style="margin: 0.3rem 0 0; font-size: 0.95rem; color: #555;">Like the tool? Consider subscribing to my channel 🔔</p>
-    </div>
+        /* The gradient text effect for the main title */
+        .gradient-title {
+            font-size: 2em;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(to right, #0083B0, #00B4DB);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        </style>
 
-    <!-- Subscribe Button -->
-    <a href="https://www.youtube.com/@TheDevilPANDA00" target="_blank"
-       style="background-color: #FF0000; color: white; padding: 8px 16px; font-size: 1rem;
-              text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-flex;
-              align-items: center; gap: 10px; box-shadow: 0 4px 8px rgba(255, 0, 0, 0.2);
-              transition: background-color 0.3s, transform 0.2s;">
-      Subscribe 🔔
-    </a>
-  </div>
-</div>
-
-<style>
-    a[href*="youtube"]:hover {
-        transform: scale(1.07);
-        box-shadow: 0 6px 16px rgba(255, 0, 0, 0.3);
-
-    }
-</style>
+        <div class="title-container">
+          <h1 class="gradient-title">🎶 Kokoro-TTS Generator - Offline 🎙️</h1>
+        </div>
         """)
 
         with gr.Tabs():
