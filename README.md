@@ -119,12 +119,6 @@ To run the Gradio app, follow these steps:
 
 ---
 
-![1](https://i.postimg.cc/pXt8kTSd/Batched-TTS-page.png)
-![2](https://i.postimg.cc/tCt6cb0N/Multi-Speech.png)
-![3](https://i.postimg.cc/L89PKW2K/Subtitle-to-voice.png)
-![4](https://i.postimg.cc/W15k271D/Voice-Mix.png)
-![5](https://i.postimg.cc/N0LrLrKd/Voice-Mix-and-Save.png)
-
 ### License
 [Kokoro model](https://huggingface.co/hexgrad/Kokoro-82M), is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)<br>
 The inference code adapted from StyleTTS2 is MIT licensed.
