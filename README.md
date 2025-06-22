@@ -41,7 +41,7 @@ Here’s the corrected version of point 4, with proper indentation for the subpo
     Find your CUDA version example ```11.8```
 
   - Visit [PyTorch Get Started](https://pytorch.org/get-started/locally/) and install the version compatible with your CUDA setup.:<br>
-    - For CUDA 11.8:
+    - For CUDA 11.8 (If you have issues installing another version then install this one):
     ```
     pip install torch  --index-url https://download.pytorch.org/whl/cu118
     ```
