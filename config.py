@@ -24,8 +24,7 @@ try:
             os.path.splitext(filename)[0]
             for filename in os.listdir("./KOKORO/voices")
             if filename.endswith('.pt')
-        ],
-        key=len
+        ]
     )
 except FileNotFoundError:
     print("Warning: './KOKORO/voices' directory not found. The voice list will be empty.")
