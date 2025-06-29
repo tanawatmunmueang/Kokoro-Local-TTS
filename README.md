@@ -41,7 +41,7 @@ Here’s the corrected version of point 4, with proper indentation for the subpo
     Find your CUDA version example ```11.8```
 
   - Visit [PyTorch Get Started](https://pytorch.org/get-started/locally/) and install the version compatible with your CUDA setup.:<br>
-    - For CUDA 11.8:
+    - For CUDA 11.8 (If you have issues installing another version then install this one):
     ```
     pip install torch  --index-url https://download.pytorch.org/whl/cu118
     ```
@@ -118,12 +118,6 @@ To run the Gradio app, follow these steps:
    Alternatively, on Windows, double-click on `run_app.bat` to start the application.
 
 ---
-
-![1](https://i.postimg.cc/pXt8kTSd/Batched-TTS-page.png)
-![2](https://i.postimg.cc/tCt6cb0N/Multi-Speech.png)
-![3](https://i.postimg.cc/L89PKW2K/Subtitle-to-voice.png)
-![4](https://i.postimg.cc/W15k271D/Voice-Mix.png)
-![5](https://i.postimg.cc/N0LrLrKd/Voice-Mix-and-Save.png)
 
 ### License
 [Kokoro model](https://huggingface.co/hexgrad/Kokoro-82M), is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)<br>
