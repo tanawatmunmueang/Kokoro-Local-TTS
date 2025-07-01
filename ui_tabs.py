@@ -2,25 +2,62 @@
 
 import gradio as gr
 import json
+import os
 
 import config
 from tts_logic import text_to_speech, podcast_maker
 from srt_logic import srt_process
 
-# A helper function for the autoplay checkbox used in multiple tabs
+# --- Helper Functions ---
+
+def read_and_combine_files(files_list):
+    """
+    Takes a list of Gradio file objects, reads them, and returns the combined text.
+    """
+    if not files_list:
+        return ""
+
+    if not isinstance(files_list, list):
+        files_list = [files_list]
+
+    combined_content = []
+    for file_obj in files_list:
+        if file_obj:
+            try:
+                with open(file_obj.name, 'r', encoding='utf-8') as f:
+                    combined_content.append(f.read().strip())
+            except Exception as e:
+                print(f"Error reading file '{os.path.basename(file_obj.name)}': {e}")
+                gr.Warning(f"Could not read file: {os.path.basename(file_obj.name)}")
+
+    # This "\n\n" is what creates the blank line between file contents.
+    return "\n\n".join(combined_content)
+
 def toggle_autoplay(autoplay):
     return gr.Audio(interactive=False, label='Output Audio', autoplay=autoplay)
+
+
+# --- UI Tab Creation Functions ---
 
 def create_batch_tts_tab():
     with gr.Blocks() as demo:
         gr.Markdown("# Batched TTS")
         with gr.Row():
             with gr.Column():
+                gr.Markdown("### Upload file(s) OR type in the box below")
+                batch_file_uploader = gr.File(
+                    label="Upload Text File(s) (.txt)",
+                    file_types=['.txt'],
+                    # <<< THIS IS THE ONLY CHANGE: from "single" to "multiple" >>>
+                    file_count="multiple"
+                )
+
                 text = gr.Textbox(
                     label='Enter Text',
-                    lines=3,
-                    placeholder="Type your text here..."
+                    lines=8,
+                    placeholder="Type your text here, or upload file(s) above..."
                 )
+
                 with gr.Row():
                     voice = gr.Dropdown(
                         config.VOICE_LIST,
@@ -52,6 +89,8 @@ def create_batch_tts_tab():
                 with gr.Accordion('Enable Autoplay', open=False):
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
                     autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
+
+        batch_file_uploader.change(fn=read_and_combine_files, inputs=batch_file_uploader, outputs=text)
 
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
         text.submit(text_to_speech, inputs=inputs, outputs=[audio])
