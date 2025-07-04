@@ -1,5 +1,3 @@
-# ui_tabs.py
-
 import gradio as gr
 import json
 import os
@@ -33,6 +31,14 @@ def read_and_combine_files(files_list):
     # This "\n\n" is what creates the blank line between file contents.
     return "\n\n".join(combined_content)
 
+def update_char_count(text_input):
+    """Counts the characters in the input text and returns it as a string."""
+    return str(len(text_input))
+
+def update_file_count(files_list):
+    """Counts the number of uploaded files and returns it as a string."""
+    return str(len(files_list)) if files_list else "0"
+
 def toggle_autoplay(autoplay):
     return gr.Audio(interactive=False, label='Output Audio', autoplay=autoplay)
 
@@ -48,15 +54,19 @@ def create_batch_tts_tab():
                 batch_file_uploader = gr.File(
                     label="Upload Text File(s) (.txt)",
                     file_types=['.txt'],
-                    # <<< THIS IS THE ONLY CHANGE: from "single" to "multiple" >>>
                     file_count="multiple"
                 )
+                # ADDED: File counter UI component
+                file_counter = gr.Textbox(label="Uploaded File Count", value="0", interactive=False)
 
                 text = gr.Textbox(
                     label='Enter Text',
                     lines=8,
+                    max_lines=8,  # This forces a fixed height and enables the scrollbar
                     placeholder="Type your text here, or upload file(s) above..."
                 )
+                # ADDED: Character counter UI component
+                char_counter = gr.Textbox(label="Character Count", value="0", interactive=False)
 
                 with gr.Row():
                     voice = gr.Dropdown(
@@ -90,7 +100,12 @@ def create_batch_tts_tab():
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
                     autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
+        # Event handler to populate the text box from uploaded files
         batch_file_uploader.change(fn=read_and_combine_files, inputs=batch_file_uploader, outputs=text)
+
+        # ADDED: Event handlers for the new counters
+        batch_file_uploader.change(fn=update_file_count, inputs=batch_file_uploader, outputs=file_counter)
+        text.input(fn=update_char_count, inputs=text, outputs=char_counter, show_progress="hidden")
 
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
         text.submit(text_to_speech, inputs=inputs, outputs=[audio])
