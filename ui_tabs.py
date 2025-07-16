@@ -2,46 +2,40 @@ import gradio as gr
 import json
 import os
 
+# Assuming these are local modules as in the original code
 import config
 from tts_logic import text_to_speech, podcast_maker
 from srt_logic import srt_process
 
 # --- Helper Functions ---
 
-def read_and_combine_files(files_list):
+def read_multiple_files(files_list):
     """
-    Takes a list of Gradio file objects, reads them, and returns the combined text.
+    Takes a list of file paths, reads them, and returns the combined text.
     """
     if not files_list:
         return ""
-
-    if not isinstance(files_list, list):
-        files_list = [files_list]
-
-    combined_content = []
-    for file_obj in files_list:
-        if file_obj:
+    contents = []
+    for file_path in files_list:
+        if file_path:
             try:
-                with open(file_obj.name, 'r', encoding='utf-8') as f:
-                    combined_content.append(f.read().strip())
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    contents.append(f.read().strip())
             except Exception as e:
-                print(f"Error reading file '{os.path.basename(file_obj.name)}': {e}")
-                gr.Warning(f"Could not read file: {os.path.basename(file_obj.name)}")
+                print(f"Error reading file '{os.path.basename(file_path)}': {e}")
+                gr.Warning(f"Could not read file: {os.path.basename(file_path)}")
+    return "\n\n".join(contents)
 
-    # This "\n\n" is what creates the blank line between file contents.
-    return "\n\n".join(combined_content)
-
-def update_char_count(text_input):
-    """Counts the characters in the input text and returns it as a string."""
-    return str(len(text_input))
+def update_char_count(text):
+    """Counts the characters in the input text and returns a formatted string."""
+    return f"Character Count: {len(text) if text else 0}"
 
 def update_file_count(files_list):
-    """Counts the number of uploaded files and returns it as a string."""
-    return str(len(files_list)) if files_list else "0"
+    """Counts the number of uploaded files and returns a formatted string."""
+    return f"Files Uploaded: {len(files_list) if files_list else 0}"
 
 def toggle_autoplay(autoplay):
     return gr.Audio(interactive=False, label='Output Audio', autoplay=autoplay)
-
 
 # --- UI Tab Creation Functions ---
 
@@ -54,19 +48,17 @@ def create_batch_tts_tab():
                 batch_file_uploader = gr.File(
                     label="Upload Text File(s) (.txt)",
                     file_types=['.txt'],
-                    file_count="multiple"
+                    file_count="multiple",
+                    type="filepath" # Set to filepath to match code 1
                 )
-                # ADDED: File counter UI component
-                file_counter = gr.Textbox(label="Uploaded File Count", value="0", interactive=False)
+                file_counter = gr.Markdown("Files Uploaded: 0")
 
                 text = gr.Textbox(
                     label='Enter Text',
                     lines=8,
-                    max_lines=8,  # This forces a fixed height and enables the scrollbar
                     placeholder="Type your text here, or upload file(s) above..."
                 )
-                # ADDED: Character counter UI component
-                char_counter = gr.Textbox(label="Character Count", value="0", interactive=False)
+                char_counter = gr.Markdown("Character Count: 0")
 
                 with gr.Row():
                     voice = gr.Dropdown(
@@ -100,12 +92,16 @@ def create_batch_tts_tab():
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
                     autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
-        # Event handler to populate the text box from uploaded files
-        batch_file_uploader.change(fn=read_and_combine_files, inputs=batch_file_uploader, outputs=text)
+        # This function updates file count, text content, and char count all at once.
+        def update_files_and_text(files_list):
+            text_content = read_multiple_files(files_list)
+            return update_file_count(files_list), text_content, update_char_count(text_content)
 
-        # ADDED: Event handlers for the new counters
-        batch_file_uploader.change(fn=update_file_count, inputs=batch_file_uploader, outputs=file_counter)
-        text.input(fn=update_char_count, inputs=text, outputs=char_counter, show_progress="hidden")
+        # A single event handler for file uploads, just like in code 1.
+        batch_file_uploader.change(fn=update_files_and_text, inputs=batch_file_uploader, outputs=[file_counter, text, char_counter])
+
+        # Event handler to update character count when text is typed manually.
+        text.change(fn=update_char_count, inputs=text, outputs=char_counter)
 
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
         text.submit(text_to_speech, inputs=inputs, outputs=[audio])
