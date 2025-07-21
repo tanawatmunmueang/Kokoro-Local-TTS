@@ -1,9 +1,11 @@
-# tts_logic.py
-
 import torch
 import gc
 import os
 import gradio as gr
+import platform
+import subprocess
+import tempfile
+import shutil
 
 # Import from local modules
 from KOKORO.models import build_model
@@ -30,14 +32,46 @@ def update_model(model_name):
     return f"Model updated to {model_name}"
 
 def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, save_path="temp.wav", remove_silence=False, minimum_silence=50):
-    """A wrapper for the core KOKORO TTS function."""
-    save_path = save_path.replace('\n', '').replace('\r', '')
-    audio_path = tts(
-        config.MODEL, config.DEVICE, text, voice_name,
-        speed=speed, trim=trim, pad_between_segments=pad_between,
-        output_file=save_path, remove_silence=remove_silence, minimum_silence=minimum_silence
-    )
-    return audio_path
+    """A wrapper for the core KOKORO TTS function that handles large text by chunking based on newlines."""
+    # Split text into chunks based on newlines, as per the requested logic.
+    text_chunks = [chunk for chunk in text.split('\n') if chunk.strip()]
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        chunk_files = []
+        for i, chunk in enumerate(text_chunks):
+            print(f"Processing chunk {i + 1}/{len(text_chunks)}...")
+            chunk_save_path = os.path.join(temp_dir, f"chunk_{i}.wav")
+            tts(
+                config.MODEL, config.DEVICE, chunk, voice_name,
+                speed=speed, trim=trim, pad_between_segments=pad_between,
+                output_file=chunk_save_path, remove_silence=remove_silence, minimum_silence=minimum_silence
+            )
+            if os.path.exists(chunk_save_path):
+                chunk_files.append(chunk_save_path)
+
+        if not chunk_files:
+            return None
+
+        if len(chunk_files) == 1:
+            print("Single audio chunk created, skipping concatenation.")
+            shutil.copy2(chunk_files[0], save_path)
+        else:
+            concat_list_path = os.path.join(temp_dir, "concat_list.txt")
+            with open(concat_list_path, 'w', encoding='utf-8') as f:
+                for file_path in chunk_files:
+                    f.write(f"file '{os.path.abspath(file_path)}'\n")
+
+            print("Concatenating audio chunks with FFmpeg...")
+            ffmpeg_path = os.path.join("ffmpeg", "ffmpeg.exe") if platform.system() == "Windows" else os.path.join("ffmpeg", "ffmpeg")
+
+            command = [
+                ffmpeg_path, '-y', '-f', 'concat', '-safe', '0', '-i',
+                concat_list_path, '-c', 'copy', os.path.abspath(save_path)
+            ]
+            subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    print("Temporary audio chunks have been cleaned up.")
+    return save_path
 
 def manage_files(file_path):
     """Validates and manages uploaded .pt files to ensure they are safe and valid."""
@@ -58,17 +92,19 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
     if not minimum_silence:
         minimum_silence = 0.05
     keep_silence = int(minimum_silence * 1000)
-    save_at = tts_file_name(text)
+
+    output_dir = "kokoro_audio"
+    os.makedirs(output_dir, exist_ok=True)
+
+    base_filename = tts_file_name(text)
+    sanitized_filename = base_filename.replace('\n', '_').replace('\r', '') # This is the fix
+    save_at = os.path.join(output_dir, sanitized_filename)
 
     final_voice_arg = voice_name
-
-    # <<< CHANGE: Revert to the simpler, original logic that works.
     voicepack_path = None
     if custom_voicepack:
-        # Handle Gradio File uploads
         if hasattr(custom_voicepack, 'name'):
             voicepack_path = custom_voicepack.name
-        # Handle path strings from the voice mixer
         elif isinstance(custom_voicepack, str):
             voicepack_path = custom_voicepack
 
@@ -83,6 +119,10 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
         text, final_voice_arg, speed, trim, pad_between_segments,
         save_at, remove_silence, keep_silence
     )
+
+    if audio_path and os.path.exists(audio_path):
+        print(f"Final audio file saved at: {os.path.abspath(audio_path)}")
+
     return audio_path
 
 def podcast_maker(text, remove_silence=False, minimum_silence=50, speed=0.9, model_name="kokoro-v0_19.pth"):
@@ -93,8 +133,18 @@ def podcast_maker(text, remove_silence=False, minimum_silence=50, speed=0.9, mod
         minimum_silence = 0.05
     keep_silence = int(minimum_silence * 1000)
 
+    output_dir = "kokoro_audio"
+    os.makedirs(output_dir, exist_ok=True)
+
     podcast_save_at = podcast(
         config.MODEL, config.DEVICE, text,
         remove_silence=remove_silence, minimum_silence=keep_silence, speed=speed
     )
+
+    if podcast_save_at and os.path.exists(podcast_save_at):
+        final_path = os.path.join(output_dir, os.path.basename(podcast_save_at))
+        shutil.move(podcast_save_at, final_path)
+        print(f"Final podcast audio file saved at: {os.path.abspath(final_path)}")
+        return final_path
+
     return podcast_save_at
