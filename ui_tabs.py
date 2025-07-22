@@ -1,3 +1,5 @@
+# ui_tabs.py
+
 import gradio as gr
 import json
 import os
@@ -6,6 +8,7 @@ import os
 import config
 from tts_logic import text_to_speech, podcast_maker
 from srt_logic import srt_process
+from voice_mixer import generate_custom_audio, get_voices
 
 # --- Helper Functions ---
 
@@ -182,6 +185,83 @@ def create_srt_dubbing_tab():
             srt_process,
             inputs=[srt_file, voice, custom_voicepack],
             outputs=[audio]
+        )
+    return demo
+
+# --- UI for Voice Mixer  ---
+def create_voice_mix_tab():
+    with gr.Blocks() as demo:
+        gr.Markdown("# Kokoro Voice Mixer\nSelect voices and adjust their weights to create a mixed voice.")
+
+        voices, slider_configs = get_voices()
+
+        voice_components = {}
+        voice_names = list(voices.keys())
+        female_voices = sorted([name for name in voice_names if "f_" in name or name == "af"])
+        male_voices = sorted([name for name in voice_names if "m_" in name or "b_" in name])
+        neutral_voices = sorted([name for name in voice_names if name not in female_voices and name not in male_voices])
+
+        num_columns = 3
+        def generate_ui_row(voice_list):
+            for i in range(0, len(voice_list), num_columns):
+                with gr.Row():
+                    for voice_name in voice_list[i:i+num_columns]:
+                        with gr.Column():
+                            checkbox = gr.Checkbox(label=slider_configs.get(voice_name, voice_name), value=False)
+                            slider = gr.Slider(minimum=0, maximum=1, value=1.0, step=0.01, interactive=False)
+                            voice_components[voice_name] = (checkbox, slider)
+                            checkbox.change(fn=lambda x: gr.update(interactive=x), inputs=[checkbox], outputs=[slider])
+
+        if female_voices: gr.Markdown("### Female Voices"); generate_ui_row(female_voices)
+        if male_voices: gr.Markdown("### Male Voices"); generate_ui_row(male_voices)
+        if neutral_voices: gr.Markdown("### Other Voices"); generate_ui_row(neutral_voices)
+
+        sorted_keys = sorted(voice_components.keys())
+        formula_inputs = [comp for key in sorted_keys for comp in voice_components[key]]
+
+        with gr.Row():
+            voice_formula = gr.Textbox(label="Voice Formula", interactive=False)
+
+        def update_voice_formula(*args):
+            formula_parts = []
+            for i, key in enumerate(sorted_keys):
+                checkbox_val = args[i*2]
+                slider_val = args[i*2+1]
+                if checkbox_val:
+                    formula_parts.append(f"{key} * {slider_val:.3f}")
+
+            formula_string = " + ".join(formula_parts)
+            return formula_string
+
+        for checkbox, slider in voice_components.values():
+            checkbox.change(update_voice_formula, inputs=formula_inputs, outputs=[voice_formula])
+            slider.change(update_voice_formula, inputs=formula_inputs, outputs=[voice_formula])
+
+        with gr.Row():
+            voice_text = gr.Textbox(label='Enter Text',
+                                    lines=10,
+                                    max_lines=10,
+                                    placeholder="Type text here to preview the custom voice...")
+
+            with gr.Accordion('Audio Settings', open=True):
+                model_name=gr.Dropdown(config.MODEL_LIST, label="Model", value=config.MODEL_LIST[0])
+                speed = gr.Slider(minimum=0.1, maximum=2, value=1, step=0.1, label='⚡️Speed', info='Adjust speaking speed')
+                remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence')
+
+        with gr.Row():
+            voice_generator = gr.Button('Generate', variant='primary')
+        with gr.Row():
+            voice_audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
+        with gr.Accordion('Enable Autoplay', open=True):
+            autoplay = gr.Checkbox(value=True, label='Autoplay')
+            autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[voice_audio])
+        with gr.Row():
+            mix_voice_download = gr.File(label="Download Mixed VoicePack")
+
+        voice_generator.click(
+            generate_custom_audio,
+            inputs=[voice_text, voice_formula, model_name, speed, remove_silence],
+            outputs=[voice_audio, mix_voice_download]
         )
     return demo
 

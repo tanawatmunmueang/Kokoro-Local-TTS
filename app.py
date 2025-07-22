@@ -11,9 +11,9 @@ from ui_tabs import (
     create_batch_tts_tab,
     create_multi_speech_tab,
     create_srt_dubbing_tab,
-    create_voice_list_tab
+    create_voice_list_tab,
+    create_voice_mix_tab
 )
-from voice_mixer import create_voice_mix_ui
 
 def initialize_app():
     """Initializes the application state, loading models and cleaning folders."""
@@ -40,7 +40,7 @@ def main(debug, share):
     demo1 = create_batch_tts_tab()
     demo2 = create_multi_speech_tab()
     demo3 = create_srt_dubbing_tab()
-    demo4 = create_voice_mix_ui()
+    demo4 = create_voice_mix_tab()
     demo5 = create_voice_list_tab()
 
     with gr.Blocks(theme=gr.themes.Ocean(), title="Kokoro TTS - Local Generator") as demo:
