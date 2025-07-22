@@ -100,13 +100,22 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
     sanitized_filename = base_filename.replace('\n', '_').replace('\r', '') # This is the fix
     save_at = os.path.join(output_dir, sanitized_filename)
 
+    # # A tuple containing all the English standard voice prefixes.
+    standard_prefixes = ("am_", "af_", "bm_", "bf_")
+
     final_voice_arg = voice_name
     voicepack_path = None
+
     if custom_voicepack:
         if hasattr(custom_voicepack, 'name'):
             voicepack_path = custom_voicepack.name
         elif isinstance(custom_voicepack, str):
             voicepack_path = custom_voicepack
+    elif not voice_name.startswith(standard_prefixes):
+        voices_dir = "./KOKORO/voices"
+        filename = f"{voice_name}.pt"
+        voicepack_path = os.path.join( voices_dir, filename )
+
 
     if voicepack_path:
         if manage_files(voicepack_path):
