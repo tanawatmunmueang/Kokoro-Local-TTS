@@ -63,17 +63,17 @@ def create_batch_tts_tab():
                 with gr.Row():
                     voice = gr.Dropdown(
                         config.VOICE_LIST,
-                        value='af_bella',
+                        value='am_michael',
                         allow_custom_value=False,
                         label='Voice',
                         info='Starred voices are more stable'
                     )
                 with gr.Row():
                     generate_btn = gr.Button('Generate', variant='primary')
-                with gr.Accordion('Audio Settings', open=False):
+                with gr.Accordion('Audio Settings', open=True):
                     model_name=gr.Dropdown(config.MODEL_LIST,label="Model",value=config.MODEL_LIST[0])
                     speed = gr.Slider(
-                        minimum=0.25, maximum=2, value=1, step=0.1,
+                        minimum=0.1, maximum=2, value=1, step=0.1,
                         label='⚡️Speed', info='Adjust the speaking speed'
                     )
                     remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
@@ -88,7 +88,7 @@ def create_batch_tts_tab():
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
             with gr.Column():
                 audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
-                with gr.Accordion('Enable Autoplay', open=False):
+                with gr.Accordion('Enable Autoplay', open=True):
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
                     autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
@@ -134,9 +134,9 @@ def create_multi_speech_tab():
                 )
                 with gr.Row():
                     generate_btn = gr.Button('Generate', variant='primary')
-                with gr.Accordion('Audio Settings', open=False):
+                with gr.Accordion('Audio Settings', open=True):
                     speed = gr.Slider(
-                        minimum=0.25, maximum=2, value=1, step=0.1,
+                        minimum=0.1, maximum=2, value=1, step=0.1,
                         label='⚡️Speed', info='Adjust the speaking speed'
                     )
                     remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')

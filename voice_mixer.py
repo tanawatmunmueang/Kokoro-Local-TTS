@@ -146,7 +146,7 @@ def create_voice_mix_ui():
             voice_generator = gr.Button('Generate', variant='primary')
         with gr.Accordion('Audio Settings', open=False):
             model_name=gr.Dropdown(config.MODEL_LIST, label="Model", value=config.MODEL_LIST[0])
-            speed = gr.Slider(minimum=0.25, maximum=2, value=1, step=0.1, label='⚡️Speed', info='Adjust speaking speed')
+            speed = gr.Slider(minimum=0.1, maximum=2, value=1, step=0.1, label='⚡️Speed', info='Adjust speaking speed')
             remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence')
         with gr.Row():
             voice_audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
