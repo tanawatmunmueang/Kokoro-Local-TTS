@@ -14,7 +14,7 @@ kokoro_audio/
 temp_audio/
 
 # Downloaded tools and dependencies
-ffmpeg/
+# ffmpeg/
 
 # Downloaded or generated model files
 # Only keep the original source models in the repo.
