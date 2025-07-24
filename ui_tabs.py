@@ -44,6 +44,9 @@ def toggle_autoplay(autoplay):
 
 def create_batch_tts_tab():
     with gr.Blocks() as demo:
+        # A hidden component to store whether default voices are 'shown' or 'hidden'.
+        visibility_state = gr.State(value="shown")
+
         gr.Markdown("# Batched TTS")
         with gr.Row():
             with gr.Column():
@@ -63,32 +66,35 @@ def create_batch_tts_tab():
                 )
                 char_counter = gr.Markdown("Character Count: 0")
 
+                gr.Markdown("### Voice Selection")
+                voice_filter = gr.Textbox(
+                    label="Filter Voices",
+                    placeholder="Type here to filter the voice list below...",
+                    interactive=True
+                )
+
                 with gr.Row():
                     voice = gr.Dropdown(
-                        config.VOICE_LIST,
+                        choices=config.VOICE_LIST,
                         value='am_michael',
                         allow_custom_value=False,
                         label='Voice',
-                        info='Starred voices are more stable'
+                        info='Default voices are more stable'
                     )
+
+                toggle_voices_btn = gr.Button("Hide Default Voices", variant='secondary')
+
                 with gr.Row():
                     generate_btn = gr.Button('Generate', variant='primary')
+
                 with gr.Accordion('Audio Settings', open=True):
                     model_name=gr.Dropdown(config.MODEL_LIST,label="Model",value=config.MODEL_LIST[0])
-                    speed = gr.Slider(
-                        minimum=0.1, maximum=2, value=1, step=0.1,
-                        label='⚡️Speed', info='Adjust the speaking speed'
-                    )
+                    speed = gr.Slider(minimum=0.1, maximum=2, value=1, step=0.1, label='⚡️Speed')
                     remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
-                    minimum_silence = gr.Number(
-                        label="Keep Silence Upto (In seconds)",
-                        value=0.05
-                    )
-                    pad_between = gr.Slider(
-                        minimum=0, maximum=2, value=0, step=0.1,
-                        label='🔇 Pad Between', info='Silent Duration between segments [For Large Text]'
-                    )
+                    minimum_silence = gr.Number(label="Keep Silence Upto (In seconds)", value=0.05)
+                    pad_between = gr.Slider(minimum=0, maximum=2, value=0, step=0.1, label='🔇 Pad Between')
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
+
             with gr.Column():
                 audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
                 with gr.Accordion('Enable Autoplay', open=True):
@@ -100,15 +106,69 @@ def create_batch_tts_tab():
             text_content = read_multiple_files(files_list)
             return update_file_count(files_list), text_content, update_char_count(text_content)
 
-        # A single event handler for file uploads, just like in code 1.
+        def toggle_default_voices(current_state):
+            """Hides or shows default voices, updating the button's appearance and dropdown choices."""
+            standard_prefixes = ("am_", "af_", "bm_", "bf_")
+
+            if current_state == "shown":
+                new_state = "hidden"
+                new_button_update = gr.update(value="Show Default Voices", variant='primary')
+                new_choices = [v for v in config.VOICE_LIST if not v.startswith(standard_prefixes)]
+                new_value = new_choices[0] if new_choices else None
+
+                return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
+            else: # current_state == "hidden"
+                new_state = "shown"
+                new_button_update = gr.update(value="Hide Default Voices", variant='secondary')
+                new_choices = config.VOICE_LIST
+                new_value = 'am_michael'
+
+                return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
+
+        def filter_voice_list(filter_text, current_voice_value, current_state):
+            """Filters dropdown choices based on text input and whether default voices are hidden."""
+            standard_prefixes = ("am_", "af_", "bm_", "bf_")
+
+            # Determine the source list based on the current visibility state.
+            source_list = config.VOICE_LIST
+            if current_state == "hidden":
+                source_list = [v for v in config.VOICE_LIST if not v.startswith(standard_prefixes)]
+
+            if not filter_text:
+                current_val_in_list = current_voice_value in source_list
+                default_val = source_list[0] if source_list else None
+                return gr.update(choices=source_list, value=current_voice_value if current_val_in_list else default_val)
+
+            filtered_choices = [v for v in source_list if filter_text.lower() in v.lower()]
+
+            new_value = None
+            if current_voice_value in filtered_choices:
+                new_value = current_voice_value
+            elif filtered_choices:
+                new_value = filtered_choices[0]
+
+            return gr.update(choices=filtered_choices, value=new_value)
+
+        # --- Event Listeners ---
+
+        toggle_voices_btn.click(
+            fn=toggle_default_voices,
+            inputs=[visibility_state],
+            outputs=[voice, toggle_voices_btn, visibility_state]
+        )
+
+        voice_filter.change(
+            fn=filter_voice_list,
+            inputs=[voice_filter, voice, visibility_state],
+            outputs=voice
+        )
+
         batch_file_uploader.change(fn=update_files_and_text, inputs=batch_file_uploader, outputs=[file_counter, text, char_counter])
-
-        # Event handler to update character count when text is typed manually.
         text.change(fn=update_char_count, inputs=text, outputs=char_counter)
-
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
         text.submit(text_to_speech, inputs=inputs, outputs=[audio])
         generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio])
+
     return demo
 
 def create_multi_speech_tab():
