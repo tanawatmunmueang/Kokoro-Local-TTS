@@ -33,12 +33,12 @@ def update_model(model_name):
 
 def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, save_path="temp.wav", remove_silence=False, minimum_silence=50):
     """A wrapper for the core KOKORO TTS function that handles large text by chunking based on newlines."""
-    # Split text into chunks based on newlines, as per the requested logic.
     text_chunks = [chunk for chunk in text.split('\n') if chunk.strip()]
 
     with tempfile.TemporaryDirectory() as temp_dir:
         chunk_files = []
         for i, chunk in enumerate(text_chunks):
+            yield None # Allows the event to be cancelled
             print(f"Processing chunk {i + 1}/{len(text_chunks)}...")
             chunk_save_path = os.path.join(temp_dir, f"chunk_{i}.wav")
             tts(
@@ -50,7 +50,8 @@ def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, sav
                 chunk_files.append(chunk_save_path)
 
         if not chunk_files:
-            return None
+            yield None
+            return
 
         if len(chunk_files) == 1:
             print("Single audio chunk created, skipping concatenation.")
@@ -71,7 +72,7 @@ def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, sav
             subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     print("Temporary audio chunks have been cleaned up.")
-    return save_path
+    yield save_path
 
 def manage_files(file_path):
     """Validates and manages uploaded .pt files to ensure they are safe and valid."""
@@ -97,7 +98,7 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
     os.makedirs(output_dir, exist_ok=True)
 
     base_filename = tts_file_name(text)
-    sanitized_filename = base_filename.replace('\n', '_').replace('\r', '') # This is the fix
+    sanitized_filename = base_filename.replace('\n', '_').replace('\r', '')
     save_at = os.path.join(output_dir, sanitized_filename)
 
     # # A tuple containing all the English standard voice prefixes.
@@ -124,15 +125,17 @@ def text_to_speech(text, model_name="kokoro-v0_19.pth", voice_name="af_bella", s
         else:
             gr.Warning("Invalid or oversized .pt file. Using the selected voice pack instead.")
 
-    audio_path = tts_maker(
+    audio_path = None
+    for path in tts_maker(
         text, final_voice_arg, speed, trim, pad_between_segments,
         save_at, remove_silence, keep_silence
-    )
+    ):
+        audio_path = path
+        yield path
 
     if audio_path and os.path.exists(audio_path):
         print(f"Final audio file saved at: {os.path.abspath(audio_path)}")
 
-    return audio_path
 
 def podcast_maker(text, remove_silence=False, minimum_silence=50, speed=0.9, model_name="kokoro-v0_19.pth"):
     """Handles the podcast-style generation with multiple voices."""

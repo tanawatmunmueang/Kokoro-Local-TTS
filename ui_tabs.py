@@ -86,6 +86,8 @@ def create_batch_tts_tab():
 
                 with gr.Row():
                     generate_btn = gr.Button('Generate', variant='primary')
+                    # Add the cancel button right here
+                    cancel_btn = gr.Button('Cancel', variant='secondary')
 
                 with gr.Accordion('Audio Settings', open=True):
                     model_name=gr.Dropdown(config.MODEL_LIST,label="Model",value=config.MODEL_LIST[0])
@@ -166,8 +168,18 @@ def create_batch_tts_tab():
         batch_file_uploader.change(fn=update_files_and_text, inputs=batch_file_uploader, outputs=[file_counter, text, char_counter])
         text.change(fn=update_char_count, inputs=text, outputs=char_counter)
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
-        text.submit(text_to_speech, inputs=inputs, outputs=[audio])
-        generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio])
+
+        # Assign the click and submit events to variables
+        tts_event = text.submit(text_to_speech, inputs=inputs, outputs=[audio])
+        generate_event = generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio])
+
+        # Add the cancel event handler
+        cancel_btn.click(
+            fn=None,
+            inputs=None,
+            outputs=None,
+            cancels=[tts_event, generate_event]
+        )
 
     return demo
 
