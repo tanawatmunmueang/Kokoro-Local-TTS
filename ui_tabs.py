@@ -89,6 +89,13 @@ def create_batch_tts_tab():
                     # Add the cancel button right here
                     cancel_btn = gr.Button('Cancel', variant='secondary')
 
+            with gr.Column():
+                with gr.Accordion('Audio Output', open=True):
+                    audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
+
+                    autoplay = gr.Checkbox(value=True, label='Autoplay')
+                    autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
+
                 with gr.Accordion('Audio Settings', open=True):
                     model_name=gr.Dropdown(config.MODEL_LIST,label="Model",value=config.MODEL_LIST[0])
                     speed = gr.Slider(minimum=0.1, maximum=2, value=1, step=0.1, label='⚡️Speed')
@@ -96,12 +103,6 @@ def create_batch_tts_tab():
                     minimum_silence = gr.Number(label="Keep Silence Upto (In seconds)", value=0.05)
                     pad_between = gr.Slider(minimum=0, maximum=2, value=0, step=0.1, label='🔇 Pad Between')
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
-
-            with gr.Column():
-                audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
-                with gr.Accordion('Enable Autoplay', open=True):
-                    autoplay = gr.Checkbox(value=True, label='Autoplay')
-                    autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
         # This function updates file count, text content, and char count all at once.
         def update_files_and_text(files_list):
