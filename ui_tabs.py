@@ -46,6 +46,7 @@ def create_batch_tts_tab():
     with gr.Blocks() as demo:
         # A hidden component to store whether default voices are 'shown' or 'hidden'.
         visibility_state = gr.State(value="shown")
+        audio_filepath_state = gr.State(value=None)
 
         gr.Markdown("# Batched TTS")
         with gr.Row():
@@ -55,7 +56,7 @@ def create_batch_tts_tab():
                     label="Upload Text File(s) (.txt)",
                     file_types=['.txt'],
                     file_count="multiple",
-                    type="filepath" # Set to filepath to match code 1
+                    type="filepath"
                 )
                 file_counter = gr.Markdown("Files Uploaded: 0")
 
@@ -86,11 +87,18 @@ def create_batch_tts_tab():
 
                 with gr.Row():
                     generate_btn = gr.Button('Generate', variant='primary')
-                    # Add the cancel button right here
                     cancel_btn = gr.Button('Cancel', variant='secondary')
 
             with gr.Column():
                 with gr.Accordion('Audio Output', open=True):
+                    max_size_mb = gr.Slider(
+                        minimum=0,maximum=1000,
+                        step=10,
+                        value=200,
+                        label="Max Preview File Size (MB)",
+                        info="Prevents browser crashes. Files over this size are generated but not loaded for preview.",
+                        interactive=True )
+
                     audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
 
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
@@ -104,13 +112,32 @@ def create_batch_tts_tab():
                     pad_between = gr.Slider(minimum=0, maximum=2, value=0, step=0.1, label='🔇 Pad Between')
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
 
-        # This function updates file count, text content, and char count all at once.
+        def check_audio_size_and_load(audio_filepath, max_mb):
+            if not audio_filepath or not os.path.exists(audio_filepath):
+                return None
+
+            try:
+                max_bytes = max_mb * 1024 * 1024
+                file_size_bytes = os.path.getsize(audio_filepath)
+
+                if file_size_bytes > max_bytes:
+                    file_size_mb = file_size_bytes / (1024 * 1024)
+                    gr.Warning(
+                        f"Audio generated successfully, but at {file_size_mb:.2f} MB, it exceeds the preview limit of {max_mb} MB. "
+                        f"You can find the output file in your `kokoro_audio` folder."
+                    )
+                    return None
+                else:
+                    return audio_filepath
+            except Exception as e:
+                gr.Warning(f"Could not check the audio file size. Error: {e}")
+                return None
+
         def update_files_and_text(files_list):
             text_content = read_multiple_files(files_list)
             return update_file_count(files_list), text_content, update_char_count(text_content)
 
         def toggle_default_voices(current_state):
-            """Hides or shows default voices, updating the button's appearance and dropdown choices."""
             standard_prefixes = ("am_", "af_", "bm_", "bf_")
 
             if current_state == "shown":
@@ -120,7 +147,7 @@ def create_batch_tts_tab():
                 new_value = new_choices[0] if new_choices else None
 
                 return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
-            else: # current_state == "hidden"
+            else:
                 new_state = "shown"
                 new_button_update = gr.update(value="Hide Default Voices", variant='secondary')
                 new_choices = config.VOICE_LIST
@@ -129,10 +156,7 @@ def create_batch_tts_tab():
                 return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
 
         def filter_voice_list(filter_text, current_voice_value, current_state):
-            """Filters dropdown choices based on text input and whether default voices are hidden."""
             standard_prefixes = ("am_", "af_", "bm_", "bf_")
-
-            # Determine the source list based on the current visibility state.
             source_list = config.VOICE_LIST
             if current_state == "hidden":
                 source_list = [v for v in config.VOICE_LIST if not v.startswith(standard_prefixes)]
@@ -143,7 +167,6 @@ def create_batch_tts_tab():
                 return gr.update(choices=source_list, value=current_voice_value if current_val_in_list else default_val)
 
             filtered_choices = [v for v in source_list if filter_text.lower() in v.lower()]
-
             new_value = None
             if current_voice_value in filtered_choices:
                 new_value = current_voice_value
@@ -151,8 +174,6 @@ def create_batch_tts_tab():
                 new_value = filtered_choices[0]
 
             return gr.update(choices=filtered_choices, value=new_value)
-
-        # --- Event Listeners ---
 
         toggle_voices_btn.click(
             fn=toggle_default_voices,
@@ -170,11 +191,15 @@ def create_batch_tts_tab():
         text.change(fn=update_char_count, inputs=text, outputs=char_counter)
         inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
 
-        # Assign the click and submit events to variables
-        tts_event = text.submit(text_to_speech, inputs=inputs, outputs=[audio])
-        generate_event = generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio])
+        tts_event = text.submit(text_to_speech, inputs=inputs, outputs=[audio_filepath_state])
+        generate_event = generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio_filepath_state])
 
-        # Add the cancel event handler
+        audio_filepath_state.change(
+            fn=check_audio_size_and_load,
+            inputs=[audio_filepath_state, max_size_mb],
+            outputs=[audio]
+        )
+
         cancel_btn.click(
             fn=None,
             inputs=None,
