@@ -101,6 +101,10 @@ def create_batch_tts_tab():
 
                     audio = gr.Audio(interactive=False, label='Output Audio', autoplay=True)
 
+                    audio_path_display = gr.Markdown("", visible=False)
+                    audio_download = gr.File(label="Download Audio", interactive=False, visible=False)
+                    size_warning = gr.Markdown("", visible=False)
+
                     autoplay = gr.Checkbox(value=True, label='Autoplay')
                     autoplay.change(toggle_autoplay, inputs=[autoplay], outputs=[audio])
 
@@ -114,7 +118,7 @@ def create_batch_tts_tab():
 
         def check_audio_size_and_load(audio_filepath, max_mb):
             if not audio_filepath or not os.path.exists(audio_filepath):
-                return None
+                return None, gr.update(value="", visible=False), gr.update(visible=False), gr.update(value="", visible=False)
 
             try:
                 max_bytes = max_mb * 1024 * 1024
@@ -122,16 +126,23 @@ def create_batch_tts_tab():
 
                 if file_size_bytes > max_bytes:
                     file_size_mb = file_size_bytes / (1024 * 1024)
-                    gr.Warning(
+                    warning_text = (
                         f"Audio generated successfully, but at {file_size_mb:.2f} MB, it exceeds the preview limit of {max_mb} MB. "
-                        f"You can find the output file in your `kokoro_audio` folder."
-                    )
-                    return None
+                        f"You can find the output file in your `kokoro_audio` folder." )
+                    return (
+                        gr.update(visible=False),  # Hide the audio output box
+                        gr.update(value=audio_filepath, visible=True),
+                        gr.update(value=warning_text, visible=True) )
                 else:
-                    return audio_filepath
+                    return (
+                    gr.update(value=audio_filepath, visible=True),
+                    gr.update(value=audio_filepath, visible=False),
+                    gr.update(value="", visible=False) )
             except Exception as e:
-                gr.Warning(f"Could not check the audio file size. Error: {e}")
-                return None
+                return (
+                    gr.update(visible=False),  # Hide the audio output box
+                    gr.update(visible=False),
+                    gr.update(value=f"⚠️ Error checking audio size: {e}", visible=True) )
 
         def update_files_and_text(files_list):
             text_content = read_multiple_files(files_list)
@@ -197,7 +208,7 @@ def create_batch_tts_tab():
         audio_filepath_state.change(
             fn=check_audio_size_and_load,
             inputs=[audio_filepath_state, max_size_mb],
-            outputs=[audio]
+            outputs=[audio, audio_download, size_warning]
         )
 
         cancel_btn.click(
