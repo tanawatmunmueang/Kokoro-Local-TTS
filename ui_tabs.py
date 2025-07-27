@@ -117,6 +117,8 @@ def create_batch_tts_tab():
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
 
         def on_start_generation():
+            # Show an info prompt to the user when generation begins.
+            gr.Info("TTS generation has started, please wait... ⏳", duration=3)
             print("Log: Generate button pressed.")
             return gr.update(value=None, visible=True), gr.update(value=None, visible=False), gr.update(value="", visible=False)
 
