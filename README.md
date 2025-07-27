@@ -7,9 +7,9 @@
 
 #### 1. Clone the GitHub Repository:
 ```bash
-git clone https://github.com/TheDevilPandaa/Kokoro-tts-aio-UI.git
+git clone https://github.com/tanawatmunmueang/Kokoro-Local-TTS.git
 
-cd Kokoro-tts-aio-UI
+cd Kokoro-Local-TTS
 ```
 
 #### 2. Create a Python Virtual Environment:
@@ -66,14 +66,20 @@ pip install -r requirements.txt
 ```
 This installs all the required Python libraries listed in the `requirements.txt` file.
 
-#### 6. Download Model and Get Latest VoicePack:
+### 6. Download Language Model Data:
+This step is required for properly splitting long text into sentences to avoid errors. In your activated terminal, run the following command:
+```bash
+python -c "import nltk; nltk.download('punkt')"
+```
+
+#### 7. Download Model and Get Latest VoicePack:
 ```bash
 python download_model.py
 ```
 
 ---
 
-#### 7. Install eSpeak NG
+#### 8. Install eSpeak NG
 
 - **For Windows:**
   1. Download the latest eSpeak NG release from the [eSpeak NG GitHub Releases](https://github.com/espeak-ng/espeak-ng/releases/tag/1.51).
@@ -93,15 +99,14 @@ python download_model.py
      > **Note:** This command suppresses unnecessary output for a cleaner installation process.
 
 ---
-#### 8. Install ffmpeg [Only For Linux Users]
+#### 9. Install ffmpeg [Only For Linux Users]
 Skip this step if you are using Windows.
 You only need FFmpeg if you plan to use it for subtitle dubbing feature. If you just want to use *Kokoro TTS*, you can *skip* this step too.
-```
-  apt-get update
-  !apt-get install -y ffmpeg
+```bash
+sudo apt-get update && sudo apt-get install -y ffmpeg
 ```
 
-#### 9. Run Gradio App
+#### 10. Run Gradio App
 
 To run the Gradio app, follow these steps:
 
