@@ -116,9 +116,13 @@ def create_batch_tts_tab():
                     pad_between = gr.Slider(minimum=0, maximum=2, value=0, step=0.1, label='🔇 Pad Between')
                     custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
 
+        def on_start_generation():
+            print("Log: Generate button pressed.")
+            return gr.update(value=None, visible=True), gr.update(value=None, visible=False), gr.update(value="", visible=False)
+
         def check_audio_size_and_load(audio_filepath, max_mb):
             if not audio_filepath or not os.path.exists(audio_filepath):
-                return None, gr.update(value="", visible=False), gr.update(visible=False), gr.update(value="", visible=False)
+                return None, gr.update(value=None, visible=False), gr.update(value="", visible=False)
 
             try:
                 max_bytes = max_mb * 1024 * 1024
@@ -200,10 +204,17 @@ def create_batch_tts_tab():
 
         batch_file_uploader.change(fn=update_files_and_text, inputs=batch_file_uploader, outputs=[file_counter, text, char_counter])
         text.change(fn=update_char_count, inputs=text, outputs=char_counter)
-        inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
 
-        tts_event = text.submit(text_to_speech, inputs=inputs, outputs=[audio_filepath_state])
-        generate_event = generate_btn.click(text_to_speech, inputs=inputs, outputs=[audio_filepath_state])
+        inputs = [text, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
+        outputs_to_reset = [audio, audio_download, size_warning]
+
+        tts_event = text.submit(fn=on_start_generation, outputs=outputs_to_reset).then(
+            fn=text_to_speech, inputs=inputs, outputs=[audio_filepath_state]
+        )
+
+        generate_event = generate_btn.click(fn=on_start_generation, outputs=outputs_to_reset).then(
+            fn=text_to_speech, inputs=inputs, outputs=[audio_filepath_state]
+        )
 
         audio_filepath_state.change(
             fn=check_audio_size_and_load,
