@@ -8,6 +8,7 @@ import platform
 import subprocess
 import tempfile
 import shutil
+import nltk
 
 # Import from local modules
 from KOKORO.models import build_model
@@ -34,13 +35,38 @@ def update_model(model_name):
     return f"Model updated to {model_name}"
 
 def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, save_path="temp.wav", remove_silence=False, minimum_silence=50):
-    """A wrapper for the core KOKORO TTS function that handles large text by chunking based on newlines."""
-    text_chunks = [chunk for chunk in text.split('\n') if chunk.strip()]
+    """A wrapper for the core KOKORO TTS function that handles large text by chunking it robustly."""
+    # This is a multi-level chunking strategy.
+    # 1. Split by paragraphs (newlines).
+    # 2. Split each paragraph by sentences.
+    # 3. As a fallback, split any very long sentences by commas.
+
+    # A safe character limit for a single chunk before we split by comma.
+    # This is a proxy for token length to avoid the IndexError.
+    SAFE_CHAR_LIMIT = 250
+
+    final_chunks = []
+    # 1. Split by paragraphs
+    paragraphs = [chunk for chunk in text.split('\n') if chunk.strip()]
+    for p in paragraphs:
+        # 2. Split paragraphs into sentences
+        sentences = nltk.sent_tokenize(p)
+        for sent in sentences:
+            if len(sent) > SAFE_CHAR_LIMIT:
+                # 3. Fallback: Split long sentences by comma
+                comma_chunks = [s.strip() for s in sent.split(',') if s.strip()]
+                final_chunks.extend(comma_chunks)
+            else:
+                final_chunks.append(sent)
+
+    text_chunks = final_chunks
 
     with tempfile.TemporaryDirectory() as temp_dir:
         chunk_files = []
         for i, chunk in enumerate(text_chunks):
             yield None # Allows the event to be cancelled
+            if not chunk.strip():
+                continue
             print(f"Processing chunk {i + 1}/{len(text_chunks)}...")
             chunk_save_path = os.path.join(temp_dir, f"chunk_{i}.wav")
             tts(
