@@ -3,6 +3,7 @@
 import gradio as gr
 import json
 import os
+import shutil
 
 # Assuming these are local modules as in the original code
 import config
@@ -29,9 +30,10 @@ def read_multiple_files(files_list):
                 gr.Warning(f"Could not read file: {os.path.basename(file_path)}")
     return "\n\n".join(contents)
 
-def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack, progress=gr.Progress()):
+def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack, local_save_path, progress=gr.Progress()):
     """
     Loops through uploaded files, generates TTS for each, and returns a list of output paths.
+    Also saves a copy to a local directory if specified.
     """
     if not files_list:
         gr.Warning("No files were uploaded to process!")
@@ -68,9 +70,24 @@ def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_
             if output_filepath and os.path.exists(output_filepath):
                 print(f"Successfully generated: {output_filepath}")
                 output_paths.append(output_filepath)
+
+                # If a local save path is provided and valid, copy the file there
+                if local_save_path and os.path.isdir(local_save_path):
+                    try:
+                        original_filename_base = os.path.splitext(os.path.basename(file_path))[0]
+                        audio_extension = os.path.splitext(output_filepath)[1]
+                        destination_path = os.path.join(local_save_path, f"{original_filename_base}{audio_extension}")
+
+                        shutil.copy2(output_filepath, destination_path)
+                        print(f"Copied generated file to: {destination_path}")
+                    except Exception as copy_e:
+                        print(f"Error copying file to {local_save_path}: {copy_e}")
+                        gr.Warning(f"Could not copy file for '{os.path.basename(file_path)}'. Check permissions.")
+                elif local_save_path:
+                    gr.Warning(f"Provided save path '{local_save_path}' is not a valid directory. File was not copied.")
+
             else:
                 print(f"File generation failed for: {os.path.basename(file_path)}")
-
 
         except Exception as e:
             import traceback
@@ -327,12 +344,20 @@ def create_files_tts_tab():
 
                 toggle_voices_btn = gr.Button("Hide Default Voices", variant='secondary')
 
-                gr.Markdown("### 3. Generate")
+                gr.Markdown("### 3. Save Options (Optional)")
+                local_save_path_input = gr.Textbox(
+                    label="Save a copy to a local folder",
+                    info="Paste a folder path here (e.g., C:\\Users\\YourName\\Audio). If valid, a copy of each audio file will be saved there.",
+                    placeholder="Leave blank to skip",
+                    interactive=True,
+                )
+
+                gr.Markdown("### 4. Generate")
                 with gr.Row():
                     generate_btn = gr.Button('Generate from Files', variant='primary')
 
             with gr.Column():
-                gr.Markdown("### 4. Download Output")
+                gr.Markdown("### 5. Download Output")
                 output_files = gr.File(
                     label="Download Generated Audio File(s)",
                     file_count="multiple",
@@ -400,7 +425,7 @@ def create_files_tts_tab():
             outputs=voice
         )
 
-        inputs = [files_uploader, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
+        inputs = [files_uploader, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack, local_save_path_input]
 
         generate_btn.click(
             fn=on_start_files_generation,
