@@ -5,11 +5,11 @@ import json
 import os
 import shutil
 
-# Assuming these are local modules as in the original code
 import config
 from tts_logic import text_to_speech, podcast_maker
 from srt_logic import srt_process
 from voice_mixer import generate_custom_audio, get_voices
+from video_logic import generate_video_from_media
 
 # --- Helper Functions ---
 
@@ -73,17 +73,15 @@ def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_
                 audio_extension = os.path.splitext(output_filepath)[1]
                 renamed_path = os.path.join(output_dir, f"{original_filename_base}{audio_extension}")
 
-                # Safely rename the file, overwriting if necessary
                 if os.path.exists(renamed_path):
                     os.remove(renamed_path)
                 os.rename(output_filepath, renamed_path)
 
-                output_filepath = renamed_path # Use the new path from now on
+                output_filepath = renamed_path
 
                 print(f"Successfully generated: {output_filepath}")
                 output_paths.append(output_filepath)
 
-                # If a local save path is provided and valid, copy the file there
                 if local_save_path and os.path.isdir(local_save_path):
                     try:
                         shutil.copy2(output_filepath, local_save_path)
@@ -442,6 +440,99 @@ def create_files_tts_tab():
             fn=process_files_tts,
             inputs=inputs,
             outputs=[output_files]
+        )
+
+    return demo
+
+def create_video_generation_tab():
+    with gr.Blocks() as demo:
+        gr.Markdown("# Audio to Video\nCreate a video from an audio file and a cover (image or video).")
+
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("### 1. Upload Media")
+                audio_input = gr.File(
+                    label="Upload Audio File",
+                    type="filepath",
+                    file_types=["audio"]
+                )
+                cover_input = gr.File(
+                    label="Upload Cover (Image or Video)",
+                    type="filepath",
+                    file_types=["image", "video"]
+                )
+
+                gr.Markdown("### 2. Configure Video Settings")
+                resolution_select = gr.Dropdown(
+                    label="Output Resolution",
+                    choices=["1080p (High Quality)", "720p (Fast)"],
+                    value="1080p (High Quality)",
+                    interactive=True
+                )
+                encoder_select = gr.Dropdown(
+                    label="Video Encoder",
+                    choices=["CPU (libx264 - Compatible)", "NVIDIA GPU (h264_nvenc - Faster)"],
+                    value="NVIDIA GPU (h264_nvenc - Faster)",
+                    interactive=True
+                )
+                video_frame_rate_slider = gr.Slider(
+                    label="Video Frame Rate (FPS)",
+                    minimum=1,
+                    maximum=60,
+                    value=1,
+                    step=1
+                )
+
+                gr.Markdown("### 3. Generate")
+                generate_video_btn = gr.Button("Generate Video", variant="primary", interactive=False)
+
+            with gr.Column(scale=2):
+                gr.Markdown("### 4. Video Output")
+                video_output = gr.Video(label="Generated Video", interactive=False)
+                video_info_display = gr.Textbox(
+                    label="Generation Details",
+                    lines=8,
+                    interactive=False,
+                    visible=False
+                )
+
+        # --- Event Handling for Video Tab ---
+        def update_button_state(audio_path, cover_path):
+            interactive = bool(audio_path and cover_path)
+            return gr.Button(interactive=interactive)
+
+        def handle_video_generation_ui(final_video_path, info_text):
+            if final_video_path:
+                return gr.Video(value=final_video_path, visible=True), gr.Textbox(value=info_text, visible=True)
+            else:
+                # If generation failed, info_text contains the error message
+                gr.Error(info_text)
+                return gr.Video(value=None, visible=False), gr.Textbox(value=info_text, visible=True)
+
+        # When audio or cover inputs change, check if the button should be enabled
+        audio_input.change(
+            fn=update_button_state,
+            inputs=[audio_input, cover_input],
+            outputs=[generate_video_btn]
+        )
+        cover_input.change(
+            fn=update_button_state,
+            inputs=[audio_input, cover_input],
+            outputs=[generate_video_btn]
+        )
+
+        # Define the full chain for the generate button click
+        generate_video_btn.click(
+            lambda: (gr.Video(visible=False), gr.Textbox(visible=False)), # Clear previous output
+            outputs=[video_output, video_info_display]
+        ).then(
+            fn=generate_video_from_media,
+            inputs=[audio_input, cover_input, resolution_select, encoder_select, video_frame_rate_slider],
+            outputs=[video_output, video_info_display] # These are temporary outputs
+        ).then(
+            fn=handle_video_generation_ui,
+            inputs=[video_output, video_info_display], # Use the temp outputs as inputs
+            outputs=[video_output, video_info_display] # Update the final state
         )
 
     return demo

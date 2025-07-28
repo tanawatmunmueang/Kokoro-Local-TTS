@@ -11,6 +11,7 @@ __pycache__/
 # Temporary or generated audio/data folders
 cache/
 kokoro_audio/
+kokoro_videos/
 temp_audio/
 
 # Downloaded tools and dependencies

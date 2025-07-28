@@ -13,7 +13,8 @@ from ui_tabs import (
     create_multi_speech_tab,
     create_srt_dubbing_tab,
     create_voice_list_tab,
-    create_voice_mix_tab
+    create_voice_mix_tab,
+    create_video_generation_tab
 )
 
 def initialize_app():
@@ -38,12 +39,13 @@ def main(debug, share):
     """Builds the Gradio UI and launches the application."""
 
     # Create the UI for each tab by calling the functions from our UI modules
-    batch_tts_tab       = create_batch_tts_tab()
-    files_tts_tab       = create_files_tts_tab()
-    multi_speech_tab    = create_multi_speech_tab()
-    srt_dubbing_tab     = create_srt_dubbing_tab()
-    voice_mix_tab       = create_voice_mix_tab()
-    voice_list_tab      = create_voice_list_tab()
+    batch_tts_tab           = create_batch_tts_tab()
+    files_tts_tab           = create_files_tts_tab()
+    multi_speech_tab        = create_multi_speech_tab()
+    srt_dubbing_tab         = create_srt_dubbing_tab()
+    voice_mix_tab           = create_voice_mix_tab()
+    voice_list_tab          = create_voice_list_tab()
+    video_generation_tab    = create_video_generation_tab()
 
     with gr.Blocks(theme=gr.themes.Ocean(), title="Kokoro TTS - Local Generator") as demo:
         gr.HTML("""
@@ -67,6 +69,8 @@ def main(debug, share):
                 voice_mix_tab.render()
             with gr.Tab("Available Voice Names"):
                 voice_list_tab.render()
+            with gr.Tab("Video Generation"):
+                video_generation_tab.render()
 
     print("Launching Gradio interface...")
     demo.queue().launch(debug=debug, share=share, server_port=8080, inbrowser=True)
