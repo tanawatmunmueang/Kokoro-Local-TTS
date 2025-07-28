@@ -32,7 +32,7 @@ def read_multiple_files(files_list):
 
 def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack, local_save_path, progress=gr.Progress()):
     """
-    Loops through uploaded files, generates TTS for each, and returns a list of output paths.
+    Loops through uploaded files, generates TTS for each, renames it, and returns a list of output paths.
     Also saves a copy to a local directory if specified.
     """
     if not files_list:
@@ -68,18 +68,26 @@ def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_
             output_filepath = final_path
 
             if output_filepath and os.path.exists(output_filepath):
+                original_filename_base = os.path.splitext(os.path.basename(file_path))[0]
+                output_dir = os.path.dirname(output_filepath)
+                audio_extension = os.path.splitext(output_filepath)[1]
+                renamed_path = os.path.join(output_dir, f"{original_filename_base}{audio_extension}")
+
+                # Safely rename the file, overwriting if necessary
+                if os.path.exists(renamed_path):
+                    os.remove(renamed_path)
+                os.rename(output_filepath, renamed_path)
+
+                output_filepath = renamed_path # Use the new path from now on
+
                 print(f"Successfully generated: {output_filepath}")
                 output_paths.append(output_filepath)
 
                 # If a local save path is provided and valid, copy the file there
                 if local_save_path and os.path.isdir(local_save_path):
                     try:
-                        original_filename_base = os.path.splitext(os.path.basename(file_path))[0]
-                        audio_extension = os.path.splitext(output_filepath)[1]
-                        destination_path = os.path.join(local_save_path, f"{original_filename_base}{audio_extension}")
-
-                        shutil.copy2(output_filepath, destination_path)
-                        print(f"Copied generated file to: {destination_path}")
+                        shutil.copy2(output_filepath, local_save_path)
+                        print(f"Copied generated file to: {os.path.join(local_save_path, os.path.basename(output_filepath))}")
                     except Exception as copy_e:
                         print(f"Error copying file to {local_save_path}: {copy_e}")
                         gr.Warning(f"Could not copy file for '{os.path.basename(file_path)}'. Check permissions.")
