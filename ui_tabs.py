@@ -29,6 +29,62 @@ def read_multiple_files(files_list):
                 gr.Warning(f"Could not read file: {os.path.basename(file_path)}")
     return "\n\n".join(contents)
 
+def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack, progress=gr.Progress()):
+    """
+    Loops through uploaded files, generates TTS for each, and returns a list of output paths.
+    """
+    if not files_list:
+        gr.Warning("No files were uploaded to process!")
+        return None
+
+    output_paths = []
+    progress(0, desc="Starting file processing...")
+
+    for i, file_path in enumerate(files_list):
+        progress(i / len(files_list), desc=f"Processing: {os.path.basename(file_path)}")
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+
+            if not content:
+                print(f"Skipping empty file: {os.path.basename(file_path)}")
+                continue
+
+            final_path = None
+            for path_from_generator in text_to_speech(
+                text=content,
+                model_name=model_name,
+                voice_name=voice,
+                speed=speed,
+                pad_between_segments=pad_between,
+                remove_silence=remove_silence,
+                minimum_silence=minimum_silence,
+                custom_voicepack=custom_voicepack
+            ):
+                final_path = path_from_generator
+
+            output_filepath = final_path
+
+            if output_filepath and os.path.exists(output_filepath):
+                print(f"Successfully generated: {output_filepath}")
+                output_paths.append(output_filepath)
+            else:
+                print(f"File generation failed for: {os.path.basename(file_path)}")
+
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            gr.Error(f"A critical error occurred while processing {os.path.basename(file_path)}: {e}")
+
+    if not output_paths:
+        gr.Info("No audio files were generated. Please check the console for errors.")
+        return None
+
+    gr.Info(f"Successfully generated {len(output_paths)} audio file(s).")
+    return gr.update(value=output_paths, visible=True)
+
+
 def update_char_count(text):
     """Counts the characters in the input text and returns a formatted string."""
     return f"Character Count: {len(text) if text else 0}"
@@ -134,21 +190,25 @@ def create_batch_tts_tab():
                     file_size_mb = file_size_bytes / (1024 * 1024)
                     warning_text = (
                         f"Audio generated successfully, but at {file_size_mb:.2f} MB, it exceeds the preview limit of {max_mb} MB. "
-                        f"You can find the output file in your `kokoro_audio` folder." )
+                        f"You can find the output file in your `kokoro_audio` folder."
+                    )
                     return (
                         gr.update(visible=False),  # Hide the audio output box
                         gr.update(value=audio_filepath, visible=True),
-                        gr.update(value=warning_text, visible=True) )
+                        gr.update(value=warning_text, visible=True)
+                    )
                 else:
                     return (
                     gr.update(value=audio_filepath, visible=True),
                     gr.update(value=audio_filepath, visible=False),
-                    gr.update(value="", visible=False) )
+                    gr.update(value="", visible=False)
+                )
             except Exception as e:
                 return (
                     gr.update(visible=False),  # Hide the audio output box
                     gr.update(visible=False),
-                    gr.update(value=f"⚠️ Error checking audio size: {e}", visible=True) )
+                    gr.update(value=f"⚠️ Error checking audio size: {e}", visible=True)
+                )
 
         def update_files_and_text(files_list):
             text_content = read_multiple_files(files_list)
@@ -229,6 +289,126 @@ def create_batch_tts_tab():
             inputs=None,
             outputs=None,
             cancels=[tts_event, generate_event]
+        )
+
+    return demo
+
+def create_files_tts_tab():
+    with gr.Blocks() as demo:
+        visibility_state = gr.State(value="shown")
+
+        gr.Markdown("# Files TTS\nUpload one or more text files to generate a separate audio file for each.")
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### 1. Upload File(s)")
+                files_uploader = gr.File(
+                    label="Upload Text File(s) (.txt)",
+                    file_types=['.txt'],
+                    file_count="multiple",
+                    type="filepath"
+                )
+                file_counter = gr.Markdown("Files Uploaded: 0")
+
+                gr.Markdown("### 2. Select Voice")
+                voice_filter = gr.Textbox(
+                    label="Filter Voices",
+                    placeholder="Type here to filter the voice list below...",
+                    interactive=True
+                )
+
+                with gr.Row():
+                    voice = gr.Dropdown(
+                        choices=config.VOICE_LIST,
+                        value='am_michael',
+                        allow_custom_value=False,
+                        label='Voice',
+                        info='Default voices are more stable'
+                    )
+
+                toggle_voices_btn = gr.Button("Hide Default Voices", variant='secondary')
+
+                gr.Markdown("### 3. Generate")
+                with gr.Row():
+                    generate_btn = gr.Button('Generate from Files', variant='primary')
+
+            with gr.Column():
+                gr.Markdown("### 4. Download Output")
+                output_files = gr.File(
+                    label="Download Generated Audio File(s)",
+                    file_count="multiple",
+                    interactive=False
+                )
+
+                with gr.Accordion('Audio Settings', open=True):
+                    model_name=gr.Dropdown(config.MODEL_LIST,label="Model",value=config.MODEL_LIST[0])
+                    speed = gr.Slider(minimum=0.1, maximum=2, value=1, step=0.1, label='⚡️Speed')
+                    remove_silence = gr.Checkbox(value=False, label='✂️ Remove Silence From TTS')
+                    minimum_silence = gr.Number(label="Keep Silence Upto (In seconds)", value=0.05)
+                    pad_between = gr.Slider(minimum=0, maximum=2, value=0, step=0.1, label='🔇 Pad Between')
+                    custom_voicepack = gr.File(label='Upload Custom VoicePack .pt file')
+
+        def toggle_default_voices(current_state):
+            standard_prefixes = ("am_", "af_", "bm_", "bf_")
+
+            if current_state == "shown":
+                new_state = "hidden"
+                new_button_update = gr.update(value="Show Default Voices", variant='primary')
+                new_choices = [v for v in config.VOICE_LIST if not v.startswith(standard_prefixes)]
+                new_value = new_choices[0] if new_choices else None
+                return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
+            else:
+                new_state = "shown"
+                new_button_update = gr.update(value="Hide Default Voices", variant='secondary')
+                new_choices = config.VOICE_LIST
+                new_value = 'am_michael'
+                return gr.update(choices=new_choices, value=new_value), new_button_update, new_state
+
+        def filter_voice_list(filter_text, current_voice_value, current_state):
+            standard_prefixes = ("am_", "af_", "bm_", "bf_")
+            source_list = config.VOICE_LIST
+            if current_state == "hidden":
+                source_list = [v for v in config.VOICE_LIST if not v.startswith(standard_prefixes)]
+
+            if not filter_text:
+                current_val_in_list = current_voice_value in source_list
+                default_val = source_list[0] if source_list else None
+                return gr.update(choices=source_list, value=current_voice_value if current_val_in_list else default_val)
+
+            filtered_choices = [v for v in source_list if filter_text.lower() in v.lower()]
+            new_value = None
+            if current_voice_value in filtered_choices:
+                new_value = current_voice_value
+            elif filtered_choices:
+                new_value = filtered_choices[0]
+            return gr.update(choices=filtered_choices, value=new_value)
+
+        def on_start_files_generation():
+            gr.Info("TTS generation for files has started... ⏳", duration=3)
+            return None
+
+        files_uploader.change(fn=update_file_count, inputs=files_uploader, outputs=file_counter)
+
+        toggle_voices_btn.click(
+            fn=toggle_default_voices,
+            inputs=[visibility_state],
+            outputs=[voice, toggle_voices_btn, visibility_state]
+        )
+
+        voice_filter.change(
+            fn=filter_voice_list,
+            inputs=[voice_filter, voice, visibility_state],
+            outputs=voice
+        )
+
+        inputs = [files_uploader, model_name, voice, speed, pad_between, remove_silence, minimum_silence, custom_voicepack]
+
+        generate_btn.click(
+            fn=on_start_files_generation,
+            outputs=[output_files]
+        ).then(
+            fn=process_files_tts,
+            inputs=inputs,
+            outputs=[output_files]
         )
 
     return demo
