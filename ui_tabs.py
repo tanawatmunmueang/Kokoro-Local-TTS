@@ -14,6 +14,31 @@ from video_logic import generate_video_from_media
 
 # --- Helper Functions ---
 
+def save_text(text_to_save, filename, save_dir):
+    """Saves the content of the textbox to a specified text file."""
+    if not filename.strip() or not save_dir.strip():
+        gr.Warning("Please provide both a file name and a save directory.")
+        return
+
+    if not text_to_save.strip():
+        gr.Warning("Textbox is empty. Nothing to save.")
+        return
+
+    if not os.path.isdir(save_dir):
+        gr.Warning(f"The specified save directory is not a valid directory: '{save_dir}'")
+        return
+
+    try:
+        # Sanitize filename
+        base_filename = os.path.basename(filename)
+        filepath = os.path.join(save_dir, f"{base_filename}.txt")
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(text_to_save)
+        gr.Info(f"Text successfully saved to: {filepath}")
+    except Exception as e:
+        gr.Error(f"Failed to save text file: {e}")
+
 def read_multiple_files(files_list):
     """
     Takes a list of file paths, reads them, and returns the combined text.
@@ -146,6 +171,19 @@ def create_batch_tts_tab():
                     placeholder="Type your text here, or upload file(s) above..."
                 )
                 char_counter = gr.Markdown("Character Count: 0")
+
+                file_name_input = gr.Textbox(
+                    label="Save File Name",
+                    info="Provide a name for the text file. The .txt extension is added automatically.",
+                    placeholder="e.g., my_story_script"
+                )
+                save_path_input = gr.Textbox(
+                    label="Save to Directory",
+                    info="Provide the full path to the folder where the text file should be saved.",
+                    placeholder="e.g., C:\\Users\\YourName\\Documents"
+                )
+
+                save_text_btn = gr.Button("Save Text", variant='secondary')
 
                 gr.Markdown("### Voice Selection")
                 voice_filter = gr.Textbox(
@@ -286,6 +324,11 @@ def create_batch_tts_tab():
             fn=filter_voice_list,
             inputs=[voice_filter, voice, visibility_state],
             outputs=voice
+        )
+
+        save_text_btn.click(
+            fn=save_text,
+            inputs=[text, file_name_input, save_path_input]
         )
 
         batch_file_uploader.change(fn=update_files_and_text, inputs=batch_file_uploader, outputs=[file_counter, text, char_counter])
