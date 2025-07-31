@@ -5,6 +5,8 @@ import json
 import os
 import shutil
 import time
+import re
+import traceback
 
 import config
 from tts_logic import text_to_speech, podcast_maker
@@ -14,30 +16,89 @@ from video_logic import generate_video_from_media
 
 # --- Helper Functions ---
 
+def validate_filename(filename):
+    """
+    Checks if a filename is valid for most operating systems.
+
+    Returns:
+        (bool, str or None): A tuple containing a boolean indicating validity
+                             and a string with the error message if invalid.
+    """
+    # Check for empty or whitespace-only strings
+    if not filename or not filename.strip():
+        return False, "Filename cannot be empty."
+
+    # Check for illegal characters
+    illegal_chars = r'[\\/*?:"<>|]'
+    found_illegal_chars = re.findall(illegal_chars, filename)
+    if found_illegal_chars:
+        # Get unique characters to display in the error
+        unique_chars = sorted(list(set(found_illegal_chars)))
+        return False, f"Filename cannot contain the following characters: {' '.join(unique_chars)}"
+
+    # Check for names that are reserved on Windows
+    reserved_names = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
+        "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
+        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    ]
+    if os.path.splitext(filename)[0].upper() in reserved_names:
+        return False, "Filename is a reserved system name and cannot be used."
+
+    # Check for filenames ending with a space or a period
+    if filename.endswith('.') or filename.endswith(' '):
+        return False, "Filename cannot end with a period or a space."
+
+    return True, None
+
+
 def save_text(text_to_save, filename, save_dir):
-    """Saves the content of the textbox to a specified text file."""
-    if not filename.strip() or not save_dir.strip():
-        gr.Warning("Please provide both a file name and a save directory.")
+    """Saves the content of the textbox to a specified text file with robust validation and error handling."""
+    # 1. Validate inputs before proceeding
+    if not save_dir.strip():
+        gr.Warning("Please provide a save directory.")
         return
 
     if not text_to_save.strip():
         gr.Warning("Textbox is empty. Nothing to save.")
         return
 
+    # 2. Validate the filename
+    is_valid, error_message = validate_filename(filename)
+    if not is_valid:
+        gr.Warning(error_message)
+        return
+
+    # 3. Check if the directory exists
     if not os.path.isdir(save_dir):
-        gr.Warning(f"The specified save directory is not a valid directory: '{save_dir}'")
+        gr.Error(f"Save directory not found or is not a valid directory: '{save_dir}'")
         return
 
     try:
-        # Sanitize filename
-        base_filename = os.path.basename(filename)
-        filepath = os.path.join(save_dir, f"{base_filename}.txt")
+        # 4. Construct the full path and attempt to save
+        filepath = os.path.join(save_dir, f"{filename}.txt")
 
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(text_to_save)
+
         gr.Info(f"Text successfully saved to: {filepath}")
+
+    except PermissionError:
+        err_msg = f"Permission denied. Cannot write to the directory '{save_dir}'. Please check your folder permissions."
+        print(f"ERROR: {err_msg}")
+        gr.Error(err_msg)
+    except OSError as e:
+        err_msg = f"An operating system error occurred while trying to save the file. Details: {e}"
+        print(f"ERROR: {err_msg}")
+        traceback.print_exc()
+        gr.Error(err_msg)
     except Exception as e:
-        gr.Error(f"Failed to save text file: {e}")
+        # Fallback for any other unexpected errors
+        err_msg = f"An unexpected error occurred while saving the file: {e}"
+        print(f"ERROR: {err_msg}")
+        traceback.print_exc() # Log the full error for debugging
+        gr.Error(err_msg)
+
 
 def read_multiple_files(files_list):
     """
@@ -122,7 +183,6 @@ def process_files_tts(files_list, model_name, voice, speed, pad_between, remove_
                 print(f"File generation failed for: {os.path.basename(file_path)}")
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
             gr.Error(f"A critical error occurred while processing {os.path.basename(file_path)}: {e}")
 
