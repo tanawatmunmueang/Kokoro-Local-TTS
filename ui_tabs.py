@@ -473,6 +473,9 @@ def create_video_generation_tab():
                     file_count="single"
                 )
 
+                with gr.Accordion("Bulk Mode File Pairings", visible=False) as pairings_accordion:
+                    file_pairings_display = gr.Markdown("Upload audio and cover files to see the pairings.")
+
                 gr.Markdown("### 2. Preview Cover Media")
                 max_preview_size_slider = gr.Slider(
                     minimum=1, maximum=500, value=50, step=1,
@@ -528,6 +531,31 @@ def create_video_generation_tab():
                 video_info_display = gr.Textbox(label="Generation Details", lines=8, interactive=False, visible=False)
 
         # --- Backend Logic and Event Handling ---
+
+        def update_pairings_display(bulk_mode, audio_paths, cover_paths):
+            if not bulk_mode or not audio_paths or not cover_paths:
+                return gr.update(visible=False), ""
+
+            num_audio, num_cover = len(audio_paths), len(cover_paths)
+            audio_filenames = [os.path.basename(p) for p in audio_paths]
+            cover_filenames = [os.path.basename(p) for p in cover_paths]
+            pairing_text = "### Audio-Cover Pairings\n\n"
+
+            if num_cover == 1:
+                pairing_text += f"**Cover:** `{cover_filenames[0]}` will be used for all audio files.\n\n"
+                for i, audio_file in enumerate(audio_filenames):
+                    pairing_text += f"{i+1}. **Audio:** `{audio_file}` → **Cover:** `{cover_filenames[0]}`\n"
+            elif num_audio == num_cover:
+                pairing_text += "Files will be paired one-to-one based on their upload order.\n\n"
+                for i, (audio_file, cover_file) in enumerate(zip(audio_filenames, cover_filenames)):
+                    pairing_text += f"{i+1}. **Audio:** `{audio_file}` → **Cover:** `{cover_file}`\n"
+            else:
+                pairing_text = (
+                    f"### ⚠️ Mismatched File Count!\n\n"
+                    f"You have **{num_audio}** audio files and **{num_cover}** cover files.\n"
+                    f"Please provide either **1 cover file** for all audio, or **one cover file for each audio file**."
+                )
+            return gr.update(visible=True), pairing_text
 
         def toggle_bulk_mode(bulk_enabled, audio_files, cover_files):
             if bulk_enabled:
@@ -647,10 +675,17 @@ def create_video_generation_tab():
 
         # --- Event Wiring ---
 
+        pairings_inputs = [bulk_mode_checkbox, audio_filepaths_state, cover_filepaths_state]
+        pairings_outputs = [pairings_accordion, file_pairings_display]
+
         bulk_mode_checkbox.change(
             fn=toggle_bulk_mode,
             inputs=[bulk_mode_checkbox, audio_filepaths_state, cover_filepaths_state],
             outputs=[audio_input, cover_input]
+        ).then(
+            fn=update_pairings_display,
+            inputs=pairings_inputs,
+            outputs=pairings_outputs
         )
 
         for comp in [audio_input, cover_input]:
@@ -658,6 +693,10 @@ def create_video_generation_tab():
                 fn=update_file_inputs,
                 inputs=[audio_input, cover_input],
                 outputs=[generate_video_btn, audio_filepaths_state, cover_filepaths_state]
+            ).then(
+                fn=update_pairings_display,
+                inputs=pairings_inputs,
+                outputs=pairings_outputs
             )
 
         for comp in [cover_input, max_preview_size_slider]:
