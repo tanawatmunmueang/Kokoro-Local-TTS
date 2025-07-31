@@ -447,35 +447,42 @@ def create_files_tts_tab():
 
 def create_video_generation_tab():
     with gr.Blocks() as demo:
-        video_filepath_state = gr.State(value=None)
-        cover_filepath_state = gr.State(value=None)
+        # States to manage file paths and results robustly
+        audio_filepaths_state = gr.State([])
+        cover_filepaths_state = gr.State([])
+        single_video_result_state = gr.State(None)
+        bulk_video_result_state = gr.State(None)
 
         gr.Markdown("# Audio to Video\nCreate a video from an audio file and a cover (image or video).")
 
         with gr.Row():
             with gr.Column(scale=1):
                 gr.Markdown("### 1. Upload Media")
+                bulk_mode_checkbox = gr.Checkbox(label="Bulk Video Generation", value=False, interactive=True)
+
                 audio_input = gr.File(
-                    label="Upload Audio File",
+                    label="Upload Audio File(s)",
                     type="filepath",
-                    file_types=["audio"]
+                    file_types=["audio"],
+                    file_count="single"
                 )
                 cover_input = gr.File(
-                    label="Upload Cover (Image or Video)",
+                    label="Upload Cover(s) (Image or Video)",
                     type="filepath",
-                    file_types=["image", "video"]
+                    file_types=["image", "video"],
+                    file_count="single"
                 )
 
                 gr.Markdown("### 2. Preview Cover Media")
                 max_preview_size_slider = gr.Slider(
                     minimum=1, maximum=500, value=50, step=1,
                     label="Max Preview Size (MB)",
-                    info="Set the size limit for loading a preview of the cover media to prevent browser lag.",
+                    info="Set the size limit for loading a preview to prevent browser lag.",
                     interactive=True
                 )
+                preview_message = gr.Markdown("", visible=False)
                 cover_preview_image = gr.Image(label="Image Preview", visible=False, interactive=False)
                 cover_preview_video = gr.Video(label="Video Preview", visible=False, interactive=False)
-                preview_message = gr.Markdown("", visible=False)
 
 
                 gr.Markdown("### 3. Configure Video Settings")
@@ -492,14 +499,13 @@ def create_video_generation_tab():
                     interactive=True
                 )
                 video_frame_rate_slider = gr.Slider(
-                    label="Video Frame Rate (FPS)",
-                    minimum=1, maximum=60, value=1, step=1
+                    label="Video Frame Rate (FPS)", minimum=1, maximum=60, value=1, step=1
                 )
 
                 gr.Markdown("### 4. Save Options (Optional)")
                 local_save_path_input = gr.Textbox(
                     label="Save a copy to a local folder",
-                    info="Paste a folder path here. If valid, a copy of the video will be saved there.",
+                    info="Paste a folder path here. If valid, a copy of the video(s) will be saved there.",
                     placeholder="Leave blank to skip",
                     interactive=True,
                 )
@@ -510,184 +516,185 @@ def create_video_generation_tab():
             with gr.Column(scale=2):
                 gr.Markdown("### 6. Video Output")
                 max_output_size_slider = gr.Slider(
-                        minimum=0,maximum=1000,
-                        step=10,
-                        value=200,
+                        minimum=0, maximum=1000, step=10, value=200,
                         label="Max Output Preview Size (MB)",
                         info="Prevents browser crashes. Videos over this size are generated but not loaded for preview.",
                         interactive=True
                 )
-                video_output = gr.Video(label="Generated Video", interactive=False, visible=False)
+                progress_log = gr.Textbox(label="Generation Log", lines=8, interactive=False)
+                video_output_player = gr.Video(label="Generated Video", interactive=False, visible=False)
                 video_size_warning = gr.Markdown("", visible=False)
-                video_info_display = gr.Textbox(
-                    label="Generation Details",
-                    lines=8,
-                    interactive=False,
-                    visible=False
-                )
+                bulk_output_files = gr.File(label="Download Generated Videos", interactive=False, visible=False, file_count="multiple")
+                video_info_display = gr.Textbox(label="Generation Details", lines=8, interactive=False, visible=False)
 
-        # --- Helper functions for event handling ---
+        # --- Backend Logic and Event Handling ---
 
-        def update_button_state(audio_path, cover_path):
-            interactive = bool(audio_path and cover_path)
-            return gr.update(interactive=interactive)
+        def toggle_bulk_mode(bulk_enabled, audio_files, cover_files):
+            if bulk_enabled:
+                return gr.update(file_count="multiple", value=[]), gr.update(file_count="multiple", value=[])
+            else:
+                new_audio = audio_files[0] if audio_files else None
+                new_cover = cover_files[0] if cover_files else None
+                if len(audio_files) > 1 or len(cover_files) > 1:
+                    gr.Info("Bulk mode disabled. Keeping only the first audio and cover file.")
+                return gr.update(file_count="single", value=new_audio), gr.update(file_count="single", value=new_cover)
 
-        def update_cover_preview(cover_path, max_mb):
-            if not cover_path or not os.path.exists(cover_path):
-                return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), cover_path
+        def update_file_inputs(audio_files, cover_files):
+            audio_paths = [audio_files] if isinstance(audio_files, str) else (audio_files or [])
+            cover_paths = [cover_files] if isinstance(cover_files, str) else (cover_files or [])
+            can_generate = bool(audio_paths and cover_paths)
+            return gr.update(interactive=can_generate), audio_paths, cover_paths
 
-            is_image = any(cover_path.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'])
-            is_video = any(cover_path.lower().endswith(ext) for ext in ['.mp4', '.mov', '.avi', '.mkv'])
+        def handle_cover_preview(cover_files, max_mb):
+            cover_paths = [cover_files] if isinstance(cover_files, str) else (cover_files or [])
 
+            if len(cover_paths) != 1:
+                return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+
+            path = cover_paths[0]
             try:
                 max_bytes = max_mb * 1024 * 1024
-                file_size_bytes = os.path.getsize(cover_path)
+                file_size_bytes = os.path.getsize(path)
 
                 if file_size_bytes > max_bytes:
                     msg = f"⚠️ Cover file is too large ({file_size_bytes / (1024*1024):.2f} MB) to preview (limit: {max_mb} MB)."
-                    return gr.update(visible=False), gr.update(visible=False), gr.update(value=msg, visible=True), cover_path
+                    return gr.update(visible=False), gr.update(visible=False), gr.update(value=msg, visible=True)
+
+                is_image = any(path.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp'])
+                is_video = any(path.lower().endswith(ext) for ext in ['.mp4', '.mov', '.avi', '.mkv'])
 
                 if is_image:
-                    return gr.update(value=cover_path, visible=True), gr.update(visible=False), gr.update(visible=False), cover_path
+                    return gr.update(value=path, visible=True), gr.update(visible=False), gr.update(visible=False)
                 elif is_video:
-                    return gr.update(visible=False), gr.update(value=cover_path, visible=True), gr.update(visible=False), cover_path
+                    return gr.update(visible=False), gr.update(value=path, visible=True), gr.update(visible=False)
                 else:
-                    msg = "⚠️ Unsupported file type for preview. Please use a standard image or video file."
-                    return gr.update(visible=False), gr.update(visible=False), gr.update(value=msg, visible=True), cover_path
-
+                    return gr.update(visible=False), gr.update(visible=False), gr.update(value="⚠️ Unsupported file type for preview.", visible=True)
             except Exception as e:
-                msg = f"Error checking cover file: {e}"
-                return gr.update(visible=False), gr.update(visible=False), gr.update(value=msg, visible=True), cover_path
-
-        def generation_wrapper(audio_path, cover_path, res, enc, fps, progress=gr.Progress(track_tqdm=True)):
-            """
-            This generator function calls the video logic and yields progress updates.
-            Every yield provides a value for each of the two output components.
-            """
-            # Update the progress bar, but do NOT yield here. This call just sends an update.
-            progress(0, desc="Starting...")
-
-            # Yield the initial UI state. This provides a value for both output components
-            # and gives the user immediate feedback.
-            yield None, "Video generation process has started, please wait..."
-
-            # Call the long-running video generation function
-            progress(0.1, desc="Generating video with FFmpeg...")
-            video_path, info_text = generate_video_from_media(audio_path, cover_path, res, enc, fps)
-
-            # Handle generation failure
-            if not video_path:
-                yield None, info_text  # Yield the error message
-                return # End the generator function
-
-            progress(0.9, desc="Finishing up...")
-
-            # Prepare the final state value for the next part of the UI chain
-            state_value = {'path': video_path, 'time': time.time()}
-
-            # Yield the final successful result to the output components
-            yield state_value, info_text
-
-        def check_output_video_size_and_load(state_value, max_mb):
-            if not isinstance(state_value, dict) or not state_value.get('path'):
-                return gr.update(value=None, visible=False), gr.update(value="", visible=False)
-
-            video_filepath = state_value['path']
-
-            if not os.path.exists(video_filepath):
-                return gr.update(value=None, visible=False), gr.update(value="", visible=False)
-
-            try:
-                max_bytes = max_mb * 1024 * 1024
-                file_size_bytes = os.path.getsize(video_filepath)
-
-                if file_size_bytes > max_bytes:
-                    file_size_mb = file_size_bytes / (1024 * 1024)
-                    warning_text = (
-                        f"✅ Video generated successfully, but at {file_size_mb:.2f} MB, it exceeds the preview limit of {max_mb} MB. "
-                        f"You can find the output file in your `kokoro_videos` folder or the specified save directory."
-                    )
-                    return gr.update(value=None, visible=False), gr.update(value=warning_text, visible=True)
-                else:
-                    return gr.update(value=video_filepath, visible=True), gr.update(value="", visible=False)
-            except Exception as e:
-                return gr.update(value=None, visible=False), gr.update(value=f"⚠️ Error checking video size: {e}", visible=True)
-
-        def save_video_copy(state_value, save_dir):
-            if not isinstance(state_value, dict) or not state_value.get('path'):
-                return
-
-            video_path = state_value['path']
-
-            if video_path and save_dir and os.path.isdir(save_dir):
-                try:
-                    shutil.copy2(video_path, save_dir)
-                    info_msg = f"Successfully copied generated video to: {os.path.join(save_dir, os.path.basename(video_path))}"
-                    gr.Info(info_msg)
-                    print(info_msg)
-                except Exception as e:
-                    warn_msg = f"Could not copy file to '{save_dir}'. Check permissions. Error: {e}"
-                    gr.Warning(warn_msg)
-                    print(warn_msg)
-            elif video_path and save_dir:
-                warn_msg = f"Provided save path '{save_dir}' is not a valid directory. File was not copied."
-                gr.Warning(warn_msg)
-                print(warn_msg)
+                return gr.update(visible=False), gr.update(visible=False), gr.update(value=f"Error: {e}", visible=True)
 
         def on_start_generation():
-            return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+            # This function clears all previous outputs when generation begins
+            return "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
 
-        # --- Event Handling for Video Tab ---
+        def start_generation(bulk_mode, audio_paths, cover_paths, res, enc, fps, save_dir, progress=gr.Progress()):
+            log_text = ""
+            # Unify single and bulk processing to simplify logic
+            if not bulk_mode:
+                 pairs = [(audio_paths[0], cover_paths[0])]
+            else:
+                num_audio, num_cover = len(audio_paths), len(cover_paths)
+                if num_cover > 1 and num_cover != num_audio:
+                    msg = "Error: Mismatched files. Use one cover for all, or one cover per audio."
+                    gr.Error(msg)
+                    # Yield an error message to the log
+                    yield None, None, msg
+                    return
+                pairs = list(zip(audio_paths, cover_paths * num_audio)) if num_cover == 1 else list(zip(audio_paths, cover_paths))
 
-        audio_input.change(
-            fn=update_button_state,
-            inputs=[audio_input, cover_input],
-            outputs=[generate_video_btn]
-        )
-        cover_input.change(
-            fn=update_button_state,
-            inputs=[audio_input, cover_input],
-            outputs=[generate_video_btn]
-        )
-        cover_input.change(
-            fn=update_cover_preview,
-            inputs=[cover_input, max_preview_size_slider],
-            outputs=[cover_preview_image, cover_preview_video, preview_message, cover_filepath_state]
-        )
-        max_preview_size_slider.change(
-            fn=update_cover_preview,
-            inputs=[cover_filepath_state, max_preview_size_slider],
-            outputs=[cover_preview_image, cover_preview_video, preview_message, cover_filepath_state]
+            generated_files = []
+            final_info_text = ""
+            for i, (audio_p, cover_p) in enumerate(pairs):
+                status_message = f"Processing file {i + 1} of {len(pairs)}: {os.path.basename(audio_p)}..."
+                log_text += status_message + "\n"
+                progress(i / len(pairs), desc=status_message)
+                # Yield intermediate log progress
+                yield None, None, log_text
+
+                video_path, info_text = generate_video_from_media(audio_p, cover_p, res, enc, fps)
+                if video_path:
+                    generated_files.append(video_path)
+                    final_info_text = info_text # Store info for single video case
+                    log_text += f"-> Generated: {os.path.basename(video_path)}\n"
+                    if save_dir and os.path.isdir(save_dir):
+                        try:
+                            shutil.copy2(video_path, save_dir)
+                            log_text += f"-> Copied to local path.\n"
+                        except Exception as e:
+                            gr.Warning(f"Could not copy {os.path.basename(video_path)}: {e}")
+                            log_text += f"-> WARNING: Failed to copy to local path: {e}\n"
+                else:
+                    log_text += f"-> FAILED to generate video.\n"
+                # Yield intermediate log progress again with the result of the generation
+                yield None, None, log_text
+
+            progress(1, desc="Complete.")
+            log_text += "\nGeneration complete."
+
+            if not bulk_mode:
+                result = {'path': generated_files[0], 'info': final_info_text} if generated_files else None
+                yield result, None, log_text
+            else:
+                yield None, generated_files, log_text
+
+        def handle_single_video_output(result, max_mb):
+            if not result or not result.get('path'):
+                return gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
+
+            video_path, info_text = result['path'], result['info']
+            try:
+                file_size_bytes = os.path.getsize(video_path)
+                if file_size_bytes > max_mb * 1024 * 1024:
+                    size_mb = file_size_bytes / (1024*1024)
+                    warning = f"✅ Video generated, but at {size_mb:.2f}MB it exceeds the {max_mb}MB preview limit. Find it in `kokoro_videos`."
+                    return gr.update(visible=False), gr.update(value=warning, visible=True), gr.update(value=info_text, visible=True)
+                else:
+                    return gr.update(value=video_path, visible=True), gr.update(visible=False), gr.update(value=info_text, visible=True)
+            except Exception as e:
+                return gr.update(visible=False), gr.update(value=f"⚠️ Error checking video size: {e}", visible=True), gr.update(visible=False)
+
+        def handle_bulk_video_output(file_list):
+            return gr.update(value=file_list, visible=bool(file_list))
+
+        # --- Event Wiring ---
+
+        bulk_mode_checkbox.change(
+            fn=toggle_bulk_mode,
+            inputs=[bulk_mode_checkbox, audio_filepaths_state, cover_filepaths_state],
+            outputs=[audio_input, cover_input]
         )
 
-        # The main click event starts the process. The show_progress="full" is what
-        # activates the progress bar and prevents timeouts.
+        for comp in [audio_input, cover_input]:
+            comp.change(
+                fn=update_file_inputs,
+                inputs=[audio_input, cover_input],
+                outputs=[generate_video_btn, audio_filepaths_state, cover_filepaths_state]
+            )
+
+        for comp in [cover_input, max_preview_size_slider]:
+            comp.change(
+                fn=handle_cover_preview,
+                inputs=[cover_input, max_preview_size_slider],
+                outputs=[cover_preview_image, cover_preview_video, preview_message]
+            )
+
         generate_video_btn.click(
             fn=on_start_generation,
-            outputs=[video_output, video_size_warning, video_info_display]
+            outputs=[progress_log, video_output_player, video_size_warning, bulk_output_files, video_info_display]
         ).then(
-            fn=generation_wrapper,
-            inputs=[audio_input, cover_input, resolution_select, encoder_select, video_frame_rate_slider],
-            outputs=[video_filepath_state, video_info_display],
-            show_progress="full"  # This is the key to activating the progress bar UI
+            fn=start_generation,
+            inputs=[bulk_mode_checkbox, audio_filepaths_state, cover_filepaths_state, resolution_select, encoder_select, video_frame_rate_slider, local_save_path_input],
+            outputs=[single_video_result_state, bulk_video_result_state, progress_log],
+            show_progress="full"
         )
 
-        # The subsequent UI updates are triggered by the completion of the main task,
-        # when the hidden state component is updated.
-        video_filepath_state.change(
-            fn=check_output_video_size_and_load,
-            inputs=[video_filepath_state, max_output_size_slider],
-            outputs=[video_output, video_size_warning]
+        single_video_result_state.change(
+            fn=handle_single_video_output,
+            inputs=[single_video_result_state, max_output_size_slider],
+            outputs=[video_output_player, video_size_warning, video_info_display]
         )
-        video_filepath_state.change(
-            fn=save_video_copy,
-            inputs=[video_filepath_state, local_save_path_input]
+
+        max_output_size_slider.change(
+            fn=handle_single_video_output,
+            inputs=[single_video_result_state, max_output_size_slider],
+            outputs=[video_output_player, video_size_warning, video_info_display]
         )
-        video_filepath_state.change(
-            fn=lambda x: gr.update(visible=True) if x else gr.update(),
-            inputs=[video_filepath_state],
-            outputs=[video_info_display]
+
+        bulk_video_result_state.change(
+            fn=handle_bulk_video_output,
+            inputs=[bulk_video_result_state],
+            outputs=[bulk_output_files]
         )
+
     return demo
 
 def create_multi_speech_tab():

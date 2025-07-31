@@ -4,7 +4,6 @@ import os
 import platform
 import subprocess
 import shutil
-import gradio as gr
 
 def format_duration_hhmmss(seconds_float):
     """Formats seconds into a HH:MM:SS or MM:SS string."""
@@ -49,7 +48,7 @@ def get_media_details(media_path):
 
     return filename, size_str, duration_str
 
-def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder_choice, frame_rate_str, progress=gr.Progress()):
+def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder_choice, frame_rate_str):
     """
     Generates a video from an audio file and a cover media (image or video).
     """
@@ -60,15 +59,12 @@ def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder
     if not audio_path or not os.path.exists(audio_path): return None, "❌ Video Generation Error: Audio file is missing."
     if not cover_path or not os.path.exists(cover_path): return None, "❌ Video Generation Error: Cover file is missing."
 
-    progress(0, desc="Analyzing audio duration...")
-
     audio_duration_seconds = get_audio_duration(audio_path)
 
     IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.bmp', '.webp']
     is_image_cover = os.path.splitext(cover_path)[1].lower() in IMAGE_EXTENSIONS
 
     width, height = (1280, 720) if resolution_choice == "720p (Fast)" else (1920, 1080)
-
     # This filter scales and pads the cover to fit the target resolution without stretching.
     vf_filter = f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1"
 
@@ -109,23 +105,10 @@ def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder
 
     try:
         print(f"Executing FFmpeg: {' '.join(command)}")
-        process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True, encoding='utf-8', bufsize=1, universal_newlines=True)
+        result = subprocess.run(command, capture_output=True, text=True, check=True, encoding='utf-8')
 
-        # Display FFmpeg's real-time status in the progress bar
-        if process.stderr:
-            for line in iter(process.stderr.readline, ''):
-                progress(0, desc=line.strip())
-        process.wait()
-
-        if process.returncode != 0:
-            stderr_output = process.stderr.read() if process.stderr else ""
-            print(f"FFmpeg failed. Stderr: {stderr_output}")
-            return None, f"❌ Video Generation Error: FFmpeg failed. Details: {stderr_output[-300:]}"
-
-        progress(1, desc="FFmpeg complete. Video saved.")
         print(f"Saved video to: {final_video_path}")
 
-        # Prepare the final information text for the UI
         filename, size, duration = get_media_details(final_video_path)
         info_text = (
             f"Generated File: {filename}\n"
@@ -139,6 +122,11 @@ def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder
 
         return final_video_path, info_text
 
+    except subprocess.CalledProcessError as e:
+        # If FFmpeg fails, log the error to the console for debugging.
+        print(f"FFmpeg failed with exit code {e.returncode}")
+        print(f"Stderr: {e.stderr}")
+        return None, f"❌ Video Generation Error: FFmpeg failed. Check console for details."
     except Exception as e:
         import traceback; traceback.print_exc()
         return None, f"❌ An unexpected error occurred: {e}"
