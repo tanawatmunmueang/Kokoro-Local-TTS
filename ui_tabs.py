@@ -71,7 +71,7 @@ def save_text(text_to_save, filename, save_dir):
 
     # 3. Check if the directory exists
     if not os.path.isdir(save_dir):
-        gr.Error(f"Save directory not found or is not a valid directory: '{save_dir}'")
+        gr.Warning(f"Save directory not found or is not a valid directory: '{save_dir}'")
         return
 
     try:
