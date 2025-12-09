@@ -5,7 +5,7 @@
 
 ### Installation Tutorial
 
-### 0. You will need python installed on your computer, recommended version is Python 3.12.10
+### You will need python installed on your computer, recommended version is Python 3.12.10
 
 #### 1. Clone the GitHub Repository:
 ```bash
