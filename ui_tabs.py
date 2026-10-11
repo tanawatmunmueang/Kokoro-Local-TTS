@@ -615,6 +615,14 @@ def create_video_generation_tab():
                 video_frame_rate_slider = gr.Slider(
                     label="Video Frame Rate (FPS)", minimum=1, maximum=60, value=30, step=1
                 )
+                bg_media_count_slider = gr.Slider(
+                    label="Background Media Count",
+                    minimum=1,
+                    maximum=100,
+                    value=5,
+                    step=1,
+                    info="Randomly select this many uploaded media files."
+                )
 
                 gr.Markdown("### 4. Save Options (Optional)")
                 local_save_path_input = gr.Textbox(
@@ -702,6 +710,23 @@ def create_video_generation_tab():
                             can_generate = True
             return gr.update(interactive=can_generate), audio_paths, cover_paths
 
+        def update_bg_media_slider(cover_files):
+            cover_paths = (
+                [cover_files]
+                if isinstance(cover_files, str)
+                else (cover_files or [])
+                )
+
+            media_count = len(cover_paths)
+
+            if media_count == 0:
+                return gr.update(value=5)
+
+            return gr.update(
+                maximum=media_count,
+                value=min(5, media_count)
+            )
+
         def handle_cover_preview(cover_files, max_mb):
             cover_paths = [cover_files] if isinstance(cover_files, str) else (cover_files or [])
 
@@ -733,7 +758,17 @@ def create_video_generation_tab():
             # This function clears all previous outputs when generation begins
             return "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
 
-        def start_generation(bulk_mode, shuffle_enabled, audio_paths, cover_paths, res, enc, fps_slider_val, save_dir, progress=gr.Progress()):
+        def start_generation(
+                bulk_mode,
+                shuffle_enabled,
+                audio_paths,
+                cover_paths,
+                res,
+                enc,
+                fps_slider_val,
+                bg_media_count,
+                save_dir,
+                progress=gr.Progress() ):
             log_text = ""
             fps = 30 if (bulk_mode and shuffle_enabled) else fps_slider_val
 
@@ -756,6 +791,17 @@ def create_video_generation_tab():
 
                     # Re-shuffle the media list for EACH audio file
                     mutable_cover_paths = list(cover_paths)
+
+                    selected_count = min(
+                        int(bg_media_count),
+                        len(mutable_cover_paths)
+                    )
+
+                    mutable_cover_paths = random.sample(
+                        mutable_cover_paths,
+                        selected_count
+                    )
+
                     random.shuffle(mutable_cover_paths)
 
                     # Call the new sequence generator function from video_logic
@@ -891,6 +937,12 @@ def create_video_generation_tab():
                 outputs=pairings_outputs
             )
 
+        cover_input.change(
+            fn=update_bg_media_slider,
+            inputs=[cover_input],
+            outputs=[bg_media_count_slider]
+        )
+
         for comp in [cover_input, max_preview_size_slider]:
             comp.change(
                 fn=handle_cover_preview,
@@ -903,7 +955,17 @@ def create_video_generation_tab():
             outputs=[progress_log, video_output_player, video_size_warning, bulk_output_files, video_info_display]
         ).then(
             fn=start_generation,
-            inputs=[bulk_mode_checkbox, shuffle_media_checkbox, audio_filepaths_state, cover_filepaths_state, resolution_select, encoder_select, video_frame_rate_slider, local_save_path_input],
+            inputs=[
+                bulk_mode_checkbox,
+                shuffle_media_checkbox,
+                audio_filepaths_state,
+                cover_filepaths_state,
+                resolution_select,
+                encoder_select,
+                video_frame_rate_slider,
+                bg_media_count_slider,
+                local_save_path_input
+            ],
             outputs=[single_video_result_state, bulk_video_result_state, progress_log],
             show_progress="full"
         )
