@@ -9,6 +9,9 @@ import subprocess
 import tempfile
 import shutil
 import nltk
+import numpy as np
+import soundfile as sf
+import io
 
 # Import from local modules
 from KOKORO.models import build_model
@@ -34,7 +37,7 @@ def update_model(model_name):
     config.CURRENT_MODEL = model_name
     return f"Model updated to {model_name}"
 
-def chunk_text(text, safe_char_limit=250):
+def chunk_text(text, safe_char_limit=500):
     """
     Splits a long string into smaller chunks using a multi-level strategy:
     1. Paragraphs
@@ -59,49 +62,62 @@ def chunk_text(text, safe_char_limit=250):
     return final_chunks
 
 def tts_maker(text, voice_name="af_bella", speed=0.8, trim=0, pad_between=0, save_path="temp.wav", remove_silence=False, minimum_silence=50):
-    """A wrapper for the core KOKORO TTS function that handles large text by chunking it robustly."""
+    """An optimized wrapper that reuses a single temp file path to prevent disk bloating and drops FFmpeg."""
 
-    text_chunks = chunk_text(text, safe_char_limit=250)
+    text_chunks = chunk_text(text)
+    audio_segments = []
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        chunk_files = []
-        for i, chunk in enumerate(text_chunks):
-            yield None # Allows the event to be cancelled
-            if not chunk.strip():
-                continue
-            print(f"Processing chunk {i + 1}/{len(text_chunks)}...")
-            chunk_save_path = os.path.join(temp_dir, f"chunk_{i}.wav")
-            tts(
-                config.MODEL, config.DEVICE, chunk, voice_name,
-                speed=speed, trim=trim, pad_between_segments=pad_between,
-                output_file=chunk_save_path, remove_silence=remove_silence, minimum_silence=minimum_silence
-            )
-            if os.path.exists(chunk_save_path):
-                chunk_files.append(chunk_save_path)
+    # Create a single temporary file path string that utils.py will accept
+    temp_chunk_path = os.path.join(tempfile.gettempdir(), "kokoro_temp_chunk.wav")
 
-        if not chunk_files:
-            yield None
-            return
+    # Process all chunks sequentially
+    for i, chunk in enumerate(text_chunks):
+        yield None # Allows the event to be cancelled in Gradio
+        if not chunk.strip():
+            continue
 
-        if len(chunk_files) == 1:
-            print("Single audio chunk created, skipping concatenation.")
-            shutil.copy2(chunk_files[0], save_path)
-        else:
-            concat_list_path = os.path.join(temp_dir, "concat_list.txt")
-            with open(concat_list_path, 'w', encoding='utf-8') as f:
-                for file_path in chunk_files:
-                    f.write(f"file '{os.path.abspath(file_path)}'\n")
+        print(f"Processing chunk {i + 1}/{len(text_chunks)}...")
 
-            print("Concatenating audio chunks with FFmpeg...")
-            ffmpeg_path = os.path.join("ffmpeg", "ffmpeg.exe") if platform.system() == "Windows" else os.path.join("ffmpeg", "ffmpeg")
+        # Remove the previous chunk file if it exists so utils.py doesn't get confused
+        if os.path.exists(temp_chunk_path):
+            try:
+                os.remove(temp_chunk_path)
+            except Exception:
+                pass
 
-            command = [
-                ffmpeg_path, '-y', '-f', 'concat', '-safe', '0', '-i',
-                concat_list_path, '-c', 'copy', os.path.abspath(save_path)
-            ]
-            subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Pass the string path to tts()
+        tts(
+            config.MODEL, config.DEVICE, chunk, voice_name,
+            speed=speed, trim=trim, pad_between_segments=pad_between,
+            output_file=temp_chunk_path, remove_silence=remove_silence, minimum_silence=minimum_silence
+        )
 
-    print("Temporary audio chunks have been cleaned up.")
+        # Immediately read the audio data from the file into RAM
+        if os.path.exists(temp_chunk_path):
+            try:
+                audio_array, samplerate = sf.read(temp_chunk_path)
+                audio_segments.append(audio_array)
+            except Exception as e:
+                print(f"Warning: Could not read chunk {i + 1} from disk: {e}")
+
+    # Clean up the single temporary chunk file at the very end
+    if os.path.exists(temp_chunk_path):
+        try:
+            os.remove(temp_chunk_path)
+        except Exception:
+            pass
+
+    if not audio_segments:
+        yield None
+        return
+
+    print("Concatenating audio chunks in RAM...")
+    final_audio = np.concatenate(audio_segments)
+
+    print("Saving single final file to disk...")
+    sf.write(save_path, final_audio, 24000)
+
+    print("Done! Generation complete.")
     yield save_path
 
 def manage_files(file_path):
