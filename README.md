@@ -75,6 +75,12 @@ python -c "import nltk; nltk.download('punkt')"
 ```
 
 #### 7. Download Model and Get Latest VoicePack:
+Installing hf_xet is optional
+```bash
+pip install hf_xet
+```
+
+Downloading voice packs
 ```bash
 python download_model.py
 ```
