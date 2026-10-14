@@ -566,7 +566,7 @@ def create_video_generation_tab():
                 shuffle_media_checkbox = gr.Checkbox(
                     label="Shuffle & Sequence Media",
                     value=True,
-                    info="Creates a looping visual sequence from all media. Bypasses count check. FPS defaults to 30.",
+                    info="Creates a looping visual sequence from all media. Bypasses count check. FPS defaults to 24.",
                     interactive=True,
                     visible=False
                 )
@@ -613,7 +613,7 @@ def create_video_generation_tab():
                     interactive=True
                 )
                 video_frame_rate_slider = gr.Slider(
-                    label="Video Frame Rate (FPS)", minimum=1, maximum=60, value=30, step=1
+                    label="Video Frame Rate (FPS)", minimum=1, maximum=60, value=24, step=1
                 )
                 bg_media_count_slider = gr.Slider(
                     label="Background Media Count",
@@ -888,7 +888,7 @@ def create_video_generation_tab():
 
         def toggle_fps_slider(bulk_mode, shuffle_enabled):
             if bulk_mode and shuffle_enabled:
-                return gr.update(interactive=False, value=30)
+                return gr.update(interactive=False, value=24)
             else:
                 return gr.update(interactive=True)
 

@@ -88,7 +88,7 @@ def generate_video_from_media(audio_path, cover_path, resolution_choice, encoder
 
     # Configure video encoder settings
     if 'nvenc' in encoder_choice:
-        encoder_params = ['-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '22', '-pix_fmt', 'yuv420p']
+        encoder_params = ['-c:v', 'h264_nvenc', '-preset', 'p1', '-cq', '22', '-pix_fmt', 'yuv420p']
     else:
         tune_param = ['-tune', 'stillimage'] if is_image_cover else []
         encoder_params = ['-c:v', 'libx264', *tune_param, '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p']
